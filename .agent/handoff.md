@@ -2,31 +2,38 @@
 
 ## Current Phase
 
-`run-until-user-gate` implementation plan complete; waiting for `user_plan_approval`.
+`run-until-user-gate` implementation (plan approved at user_plan_approval).
 
 ## Current Status
 
-The `run-until-user-gate` design was reviewed by the Claude Code review session and approved with minor comments. Codex incorporated the review findings D1-D5 into an implementation plan.
+The plan was reviewed by the Claude Code review session (plan_review: Approved with minor comments, no blocking/major; load-bearing assumptions verified against source). The user CLEARED the `user_plan_approval` gate: approved the plan with push included, and chose subagent-driven execution.
 
 Plan artifact: `.agent/artifacts/run_until_user_gate_plan.md`.
-Design artifact: `.agent/artifacts/run_until_user_gate_design.md`.
-Design review artifact: `.agent/artifacts/run_until_user_gate_design_review.md`.
+Plan review: `.agent/artifacts/run_until_user_gate_plan_review.md`.
+Design + design review: `.agent/artifacts/run_until_user_gate_design.md`, `.agent/artifacts/run_until_user_gate_design_review.md`.
 
-No implementation code has been changed for this wave yet. Manual handoff mode remains in effect.
+Manual handoff mode remains in effect.
 
 ## Previous Actor
 
-Codex
+User (approved plan)
 
 ## Next Actor
 
-User
+Codex (implementation agent)
 
 ## Current Task
 
-User reviews `.agent/artifacts/run_until_user_gate_plan.md` and decides whether to approve implementation.
+Implement `.agent/artifacts/run_until_user_gate_plan.md` task-by-task (Tasks 1-8) using `superpowers:subagent-driven-development`, with TDD red/green per task and verification before completion. Commit per task and `git push origin main` at Task 8 (push approved). Then hand off to the Claude review session for implementation review.
 
-This is the `user_plan_approval` gate. Do not implement `run-until-user-gate` until the user approves the plan.
+User decisions made at the gate:
+- Plan approved (push included).
+- Execution style: subagent-driven.
+
+Plan review awareness items to honor during implementation:
+- N1: per-task commits + push-before-review are approved.
+- N2: when modifying the existing `args.test.ts` delimiter test, preserve (do not weaken) existing coverage.
+- Keep scope to `run-until-user-gate` only; do NOT start Gate Delegation, add delegation config, `review_verdict.json`, or any gate auto-pass.
 
 ## What Was Done
 
@@ -107,16 +114,11 @@ The plan explicitly stops after implementation review handoff and forbids starti
 
 ## User Decisions Required
 
-- Approve `.agent/artifacts/run_until_user_gate_plan.md` for implementation, or request revisions.
-- If approving, choose the execution style if desired:
-  - Subagent-driven execution
-  - Inline execution in the current session
+None — the user_plan_approval gate is cleared (plan approved, push included, subagent-driven execution).
 
 ## Next Required Action
 
-Wait for user plan approval.
-
-After approval, Codex should implement the plan task-by-task using `superpowers:subagent-driven-development` or `superpowers:executing-plans`, with TDD and verification before completion.
+Codex implements `.agent/artifacts/run_until_user_gate_plan.md` task-by-task with `superpowers:subagent-driven-development` (TDD per task, verification before completion), committing per task and pushing at Task 8. On completion, Codex hands off to the Claude review session for the implementation review of this wave.
 
 ---
 
