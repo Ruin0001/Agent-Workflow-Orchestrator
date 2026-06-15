@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.tmp/
+*.log
+.agent/logs/
+.agent/prompts/
+.agent/agent-flow.lock
+.agent/next_state_proposal.json
+.agent/workflow_state.json

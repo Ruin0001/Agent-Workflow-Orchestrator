@@ -1,0 +1,1206 @@
+# Agent Workflow Orchestrator Design Brief
+
+## 1. Purpose
+
+You are Codex.
+
+Your current job is to design a CLI-based workflow orchestrator for coordinating multiple AI coding agents, especially Codex and Claude Code.
+
+Do not implement anything yet.
+
+Do not edit files.
+
+Do not create commits.
+
+Do not run destructive commands.
+
+First produce design artifacts that clarify requirements, architecture, state management, guardrails, extensibility, and the first safe implementation task.
+
+## 2. Background
+
+The user currently uses an AI-assisted development workflow with separate implementation and review roles.
+
+The default workflow is:
+
+1. Research and requirement understanding
+2. Spec creation
+3. Spec review
+4. Spec review response
+5. User Spec review
+6. Plan creation
+7. Plan review
+8. Plan review response
+9. User Plan approval
+10. Task classification
+11. Implementation
+12. Implementation review
+13. Implementation review response
+14. Testing
+15. User verification
+16. Final handoff
+
+Default role assignment:
+
+* Codex: implementation agent
+* Claude Code: review agent
+
+The roles may be overridden per project.
+
+The user uses Superpowers where available:
+
+* Code writing: `superpowers:subagent-driven-development`
+* Requesting review: `superpowers:requesting-code-review`
+* Receiving review: `superpowers:receiving-code-review`
+* Verification before completion: `superpowers:verification-before-completion`
+* Final branch handoff: `superpowers:finishing-a-development-branch`
+
+The goal is to reduce manual handoff work between agents while preserving user approval gates and safety controls.
+
+## 3. Product Concept
+
+Build a deterministic CLI orchestrator that coordinates headless AI coding agents.
+
+The orchestrator itself should not need to be an LLM.
+
+It should act as:
+
+* State machine
+* Agent caller
+* Artifact manager
+* Guardrail engine
+* User gate controller
+* Diff checker
+* Log manager
+* Workflow runner
+
+The AI agents remain responsible for reasoning, writing, implementation, review, and review response.
+
+The orchestrator is responsible for deciding when to call which agent, validating transitions, enforcing user gates, checking file changes, and preserving workflow state.
+
+## 4. Core Design Principle
+
+The orchestrator is the controller.
+
+Codex and Claude Code are workers.
+
+The user is the final authority.
+
+```text
+User
+  ↓
+Orchestrator CLI
+  ├─ calls implementation agent
+  └─ calls review agent
+```
+
+Do not design the system as Codex directly calling Claude Code or Claude Code directly calling Codex.
+
+Agents should not recursively call each other.
+
+The orchestrator should decide the next actor based on workflow state.
+
+## 5. Key Requirement
+
+The orchestrator must support existing projects with different repository structures.
+
+Do not assume a fixed file layout, package manager, language, test command, or artifact directory.
+
+The tool should provide sensible defaults, but everything project-specific must be configurable.
+
+Default state/artifact directory may be `.agent/`, but this must not be hardcoded.
+
+## 6. Target Users
+
+Primary user:
+
+* A developer who uses multiple AI coding agents in a structured workflow.
+
+Secondary users:
+
+* Developers who want controlled semi-automatic handoff between implementation and review agents.
+* Teams that want repeatable agentic development workflows.
+* Developers who want stronger guardrails around AI coding agents.
+
+## 7. Non-Goals
+
+Do not design this as:
+
+* A new LLM agent.
+* A replacement for Codex or Claude Code.
+* A fully autonomous system that ignores user gates.
+* A cloud service.
+* A GUI-first product.
+* A project-specific script hardcoded for one repository.
+* A general CI/CD platform.
+* A package manager wrapper.
+* A test runner replacement.
+
+The first version should be a local CLI.
+
+## 8. Core Workflow
+
+The orchestrator should support this standard phase sequence:
+
+```text
+requirement_understanding
+→ spec_creation
+→ spec_review
+→ spec_review_response
+→ user_spec_review
+→ plan_creation
+→ plan_review
+→ plan_review_response
+→ user_plan_approval
+→ task_classification
+→ implementation
+→ implementation_review
+→ implementation_review_response
+→ testing
+→ user_verification
+→ final_handoff
+→ done
+```
+
+Review phases may iterate.
+
+User gate phases must stop automation.
+
+## 9. Required User Gates
+
+The orchestrator must stop when any of the following is required:
+
+* User Spec review
+* User Plan approval
+* User decision
+* User verification
+* Destructive action approval
+* Protected path approval
+* Plan deviation approval
+* Production data or credential access approval
+
+The orchestrator must never skip these gates.
+
+## 10. Automation Modes
+
+Support multiple automation modes.
+
+### 10.1 Advisory Mode
+
+The orchestrator only suggests the next step and generates prompts.
+
+It does not call agents automatically.
+
+### 10.2 Assisted Mode
+
+The orchestrator runs one workflow step per command.
+
+Example:
+
+```bash
+agent-flow next
+```
+
+This should run exactly one phase and then stop.
+
+### 10.3 Run Until User Gate
+
+The orchestrator continues through safe phases until a user gate is reached.
+
+Example:
+
+```bash
+agent-flow run-until-user-gate
+```
+
+### 10.4 Low-Risk Auto Mode
+
+The orchestrator may automatically iterate only low-risk tasks.
+
+This mode should be disabled by default.
+
+Mechanical and Simple tasks may be eligible.
+
+Integration, Design-sensitive, and Risk-sensitive tasks should require stronger checks or user confirmation.
+
+## 11. Project Configurability
+
+The orchestrator must read project configuration from a file such as:
+
+```text
+.agent-flow.yaml
+```
+
+The config file should allow overriding:
+
+* State directory
+* Artifact directory
+* Log directory
+* Agent commands
+* Agent CLI arguments
+* Input/output mode
+* Source-of-truth documents
+* Protected paths
+* Paths protected unless explicitly authorized
+* Test commands
+* Build commands
+* Package manager
+* Workspace layout
+* Automation mode
+* Iteration limits
+* Diff limits
+* Timeout limits
+* Guardrail policies
+
+## 12. Example Configuration Shape
+
+Use this as a design reference, not necessarily final syntax.
+
+```yaml
+version: 1
+
+workspace:
+  root: "."
+  state_dir: ".agent"
+  artifact_dir: ".agent/artifacts"
+  log_dir: ".agent/logs"
+
+mode:
+  default: "assisted"
+  allow_run_until_user_gate: true
+  allow_full_auto: false
+
+agents:
+  implementation:
+    role: "implementation"
+    name: "Codex"
+    command: "codex"
+    args:
+      - "exec"
+    input_mode: "stdin"
+    output_mode: "stdout"
+
+  review:
+    role: "review"
+    name: "Claude Code"
+    command: "claude"
+    args:
+      - "-p"
+    input_mode: "stdin"
+    output_mode: "stdout"
+
+workflow:
+  require_user_spec_review: true
+  require_user_plan_approval: true
+  require_user_verification: true
+
+  max_iterations:
+    spec_review: 3
+    plan_review: 3
+    implementation_review: 3
+
+project:
+  type: "auto"
+  package_manager: "auto"
+
+commands:
+  detect: true
+  test:
+    typecheck: null
+    lint: null
+    test: null
+    build: null
+
+guardrails:
+  allow_files_only_if_listed_in_plan: true
+  allow_dependency_changes_only_if_listed_in_plan: true
+  allow_ci_changes_only_if_listed_in_plan: true
+
+  protected_paths:
+    - ".env"
+    - ".env.*"
+    - ".git/**"
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - "coverage/**"
+
+  protected_unless_explicitly_allowed:
+    - "package.json"
+    - "pnpm-lock.yaml"
+    - "package-lock.json"
+    - "yarn.lock"
+    - "Dockerfile"
+    - "docker-compose.yml"
+    - ".github/workflows/**"
+
+  blocked_commands:
+    - "rm -rf"
+    - "git reset --hard"
+    - "git clean -fd"
+    - "docker system prune"
+
+limits:
+  max_changed_files: 15
+  max_added_lines: 1200
+  max_deleted_lines: 800
+  command_timeout_seconds: 600
+
+artifacts:
+  requirement_understanding: ".agent/artifacts/requirement_understanding.md"
+  spec: ".agent/artifacts/spec.md"
+  spec_review: ".agent/artifacts/spec_review.md"
+  spec_review_response: ".agent/artifacts/spec_review_response.md"
+  plan: ".agent/artifacts/plan.md"
+  plan_review: ".agent/artifacts/plan_review.md"
+  plan_review_response: ".agent/artifacts/plan_review_response.md"
+  task_classification: ".agent/artifacts/task_classification.md"
+  implementation_notes: ".agent/artifacts/implementation_notes.md"
+  implementation_review: ".agent/artifacts/implementation_review.md"
+  implementation_review_response: ".agent/artifacts/implementation_review_response.md"
+  test_results: ".agent/artifacts/test_results.md"
+  final_handoff: ".agent/artifacts/final_handoff.md"
+
+project_context:
+  files:
+    - "README.md"
+  source_of_truth: []
+  extra_instructions: []
+```
+
+## 13. State Management
+
+The orchestrator should maintain a machine-readable state file.
+
+Default path:
+
+```text
+.agent/workflow_state.json
+```
+
+This path must be configurable.
+
+The state file should track:
+
+* Workflow version
+* Current phase
+* Current status
+* Current actor
+* Next actor
+* Lock state
+* Agent mapping
+* Session mapping
+* Current task
+* Artifact refs
+* User gates
+* Iteration counters
+* Last actor
+* Last action
+* Updated timestamp
+
+## 14. State File Ownership
+
+Prefer this model:
+
+* Agents may produce artifacts.
+* Agents may produce a next state proposal.
+* The orchestrator performs final validation.
+* The orchestrator writes the canonical workflow state.
+
+The design should consider whether agents are allowed to modify the state file directly.
+
+Preferred long-term design:
+
+```text
+Agent writes:
+- artifact markdown
+- handoff markdown
+- next_state_proposal.json
+
+Orchestrator validates and writes:
+- workflow_state.json
+```
+
+This reduces the risk of an agent accidentally skipping a user gate or moving to an invalid phase.
+
+## 15. Next State Proposal
+
+Consider adding a file such as:
+
+```text
+.agent/next_state_proposal.json
+```
+
+Example:
+
+```json
+{
+  "proposed_next_phase": "plan_review",
+  "proposed_next_actor": "review",
+  "reason": "The implementation agent completed the Plan artifact.",
+  "artifacts_updated": [".agent/artifacts/plan.md"],
+  "requires_user_gate": false
+}
+```
+
+The orchestrator should validate the proposal before updating canonical state.
+
+## 16. Locking
+
+The orchestrator should prevent concurrent writes.
+
+State should include:
+
+* locked_by
+* lock_reason
+* lock_acquired_at
+
+Agents should not write artifacts or state while another actor holds the lock.
+
+The orchestrator should own lock acquisition and release if possible.
+
+If direct agent writes are allowed in MVP, the orchestrator must validate the state after each agent run.
+
+## 17. Artifact Management
+
+The orchestrator should manage artifact paths through configuration.
+
+Standard artifacts:
+
+* Requirement Understanding
+* Spec
+* Spec Review Report
+* Spec Review Response
+* Plan
+* Plan Review Report
+* Plan Review Response
+* Task Complexity Classification
+* Task Packets
+* Implementation Notes
+* Implementation Review Report
+* Implementation Review Response
+* Test Results
+* Final Handoff
+
+Artifacts should be Markdown unless machine-readable data is required.
+
+## 18. Handoff Document
+
+The orchestrator should support a human-readable handoff document.
+
+Default path:
+
+```text
+.agent/handoff.md
+```
+
+Required sections:
+
+```markdown
+# Agent Handoff
+
+## Current Phase
+
+## Current Status
+
+## Previous Actor
+
+## Next Actor
+
+## Current Task
+
+## What Was Done
+
+## Artifacts Created or Updated
+
+## Files Changed
+
+## Commands Run
+
+## Review Focus for Next Agent
+
+## Known Risks
+
+## Open Questions
+
+## User Decisions Required
+
+## User Verification Required
+
+## Next Required Action
+```
+
+## 19. Log Management
+
+Maintain append-only logs.
+
+Default paths may include:
+
+```text
+.agent/logs/runs.jsonl
+.agent/logs/agent_log.md
+```
+
+Each run should record:
+
+* Timestamp
+* Phase
+* Actor
+* Agent command
+* Prompt file
+* Output artifact
+* Exit code
+* Duration
+* Files changed
+* Guardrail result
+* Next phase
+* Next actor
+
+Do not store secrets in logs.
+
+## 20. Agent Adapters
+
+Design agent invocation through adapters.
+
+Agent adapters should support:
+
+* Command
+* Arguments
+* Environment variables
+* Input mode
+* Output mode
+* Working directory
+* Timeout
+* Exit code handling
+* Stdout capture
+* Stderr capture
+* Optional transcript capture
+
+Initial target adapters:
+
+* Codex CLI
+* Claude Code CLI
+
+Future adapters:
+
+* Gemini CLI
+* Antigravity CLI
+* OpenCode
+* Cursor
+* Custom shell command
+
+Do not hardcode CLI flags in the core state machine.
+
+## 21. Prompt Management
+
+The orchestrator should assemble prompts from templates.
+
+Prompt templates should exist for:
+
+* Requirement Understanding
+* Spec creation
+* Spec review
+* Spec review response
+* Plan creation
+* Plan review
+* Plan review response
+* Task classification
+* Implementation
+* Implementation review
+* Implementation review response
+* Verification
+* Final handoff
+
+Prompts should include:
+
+* Project context
+* Current workflow phase
+* Relevant artifact paths
+* Role assignment
+* Required Superpowers skill if available
+* Output format
+* Stop condition
+* Guardrail constraints
+
+## 22. Superpowers Integration
+
+The orchestrator should not require Superpowers to function.
+
+However, when available, prompts should instruct agents to use appropriate skills.
+
+Skill mapping:
+
+* Implementation:
+
+  * `superpowers:subagent-driven-development`
+* Review request / review:
+
+  * `superpowers:requesting-code-review`
+* Review response:
+
+  * `superpowers:receiving-code-review`
+* Verification:
+
+  * `superpowers:verification-before-completion`
+* Final branch handoff:
+
+  * `superpowers:finishing-a-development-branch`
+
+If a skill is not available, agents should follow the equivalent manual workflow.
+
+## 23. Task Complexity Gate
+
+Before implementation, the orchestrator should require task complexity classification.
+
+Categories:
+
+* Mechanical
+* Simple
+* Integration
+* Design-sensitive
+* Risk-sensitive
+
+Review depth should depend on classification.
+
+### Mechanical
+
+Examples:
+
+* Exact file generation
+* Simple rename
+* Documentation-only change
+* Formatting-only change
+
+Recommended review:
+
+* Direct implementation or lightweight diff-check
+
+### Simple
+
+Examples:
+
+* Single-file logic change
+* Low-risk bug fix
+* Small test addition
+
+Recommended review:
+
+* Single combined review:
+
+  * Plan compliance
+  * Code correctness
+  * Edge cases
+
+### Integration
+
+Examples:
+
+* Multi-file change
+* API flow change
+* State management change
+* Cross-module behavior
+
+Recommended review:
+
+* Two-stage review:
+
+  1. Spec / Plan compliance
+  2. Code quality
+
+### Design-sensitive
+
+Examples:
+
+* Architecture changes
+* New abstractions
+* Public API design
+* Data model changes
+
+Recommended review:
+
+* Plan reconfirmation if needed
+* Two-stage review
+* Architecture review if needed
+
+### Risk-sensitive
+
+Examples:
+
+* Security
+* Privacy
+* Authentication
+* Authorization
+* Payment
+* Data deletion
+* File system mutation
+* Network transmission of sensitive data
+* Production data access
+
+Recommended review:
+
+* Two-stage review
+* Additional security / privacy / data safety review
+* Explicit user verification
+
+## 24. Guardrails
+
+The orchestrator must enforce guardrails deterministically.
+
+Required guardrails:
+
+1. User gates
+2. Allowed phase transitions
+3. Locking
+4. Iteration limits
+5. Protected path changes
+6. Plan-authorized file changes
+7. Dependency change control
+8. CI/config change control
+9. Destructive command control
+10. Diff size limits
+11. Test claim validation
+12. Artifact existence validation
+13. Required stop conditions
+
+## 25. Protected Paths
+
+The system should support two levels of path protection.
+
+### 25.1 Always Protected
+
+Examples:
+
+* `.env`
+* `.env.*`
+* `.git/**`
+* `node_modules/**`
+* `dist/**`
+* `build/**`
+* `coverage/**`
+
+### 25.2 Protected Unless Explicitly Authorized
+
+Examples:
+
+* `package.json`
+* `pnpm-lock.yaml`
+* `package-lock.json`
+* `yarn.lock`
+* `Dockerfile`
+* `docker-compose.yml`
+* `.github/workflows/**`
+
+These may be changed only if the approved Plan explicitly authorizes them.
+
+## 26. Allowed Change Manifest
+
+The Plan should produce or include an allowed change manifest.
+
+Example:
+
+```yaml
+allowed_changes:
+  files_to_inspect:
+    - "src/foo.ts"
+
+  files_to_modify:
+    - "src/foo.ts"
+    - "src/foo.test.ts"
+
+  files_to_create:
+    - "src/foo-helper.ts"
+
+  forbidden_paths:
+    - ".env"
+    - "pnpm-lock.yaml"
+
+  dependency_changes:
+    allowed: false
+
+  migration_changes:
+    allowed: false
+
+  destructive_actions:
+    allowed: false
+```
+
+The orchestrator should compare actual git diff against this manifest after implementation.
+
+## 27. Diff Checking
+
+After implementation phases, the orchestrator should check:
+
+* Changed files
+* Added lines
+* Deleted lines
+* Protected path changes
+* Files outside allowed manifest
+* Dependency file changes
+* CI/config changes
+* Generated artifact changes
+
+If unauthorized changes are found, stop and set user gate or blocked state.
+
+## 28. Commands
+
+Design the CLI around commands like:
+
+```bash
+agent-flow init
+agent-flow status
+agent-flow next
+agent-flow run-until-user-gate
+agent-flow approve spec
+agent-flow approve plan
+agent-flow block "reason"
+agent-flow resume
+agent-flow verify
+agent-flow handoff
+agent-flow finish
+```
+
+Potential additional commands:
+
+```bash
+agent-flow config validate
+agent-flow detect
+agent-flow artifacts list
+agent-flow logs tail
+agent-flow reset-lock
+agent-flow propose-next
+```
+
+## 29. Suggested MVP Scope
+
+The MVP should be small and safe.
+
+MVP should include:
+
+1. Config loading from `.agent-flow.yaml`
+2. Config defaults
+3. State initialization
+4. State schema validation
+5. Basic finite-state machine
+6. Prompt template loading
+7. Agent command invocation
+8. Artifact output capture
+9. User gate enforcement
+10. Append-only run log
+11. Basic diff check
+12. Protected path check
+13. Assisted mode with `agent-flow next`
+
+MVP should not include:
+
+* Full auto mode
+* GUI
+* Remote execution
+* Multi-repository orchestration
+* Parallel agents
+* Cloud sync
+* Plugin marketplace
+* Complex web dashboard
+
+## 30. Preferred First Implementation Task
+
+Prefer the first implementation task to be repository bootstrap for the orchestrator itself.
+
+The first task should be small and safe.
+
+Likely first task:
+
+```text
+T-P0-01 Initialize CLI project skeleton
+```
+
+Expected scope:
+
+* Create package structure
+* Add TypeScript config
+* Add CLI entrypoint
+* Add config schema types
+* Add state schema types
+* Add basic `init` command
+* Add basic `status` command
+* Add tests for config/state schema validation
+
+Do not implement actual agent invocation in the first task unless the design identifies a strong reason to include it.
+
+## 31. Technical Stack Preference
+
+Unless you identify a better reason, prefer:
+
+* Runtime: Node.js LTS
+* Language: TypeScript strict
+* Package manager: pnpm
+* CLI framework: oclif, Commander, or Clipanion
+* Schema validation: Zod or Valibot
+* YAML parsing: yaml
+* Test runner: Vitest
+* Formatting: Prettier
+* Linting: ESLint
+
+You must evaluate whether these choices are appropriate.
+
+Do not assume they are final without analysis.
+
+## 32. Design Questions to Resolve
+
+Please analyze and answer:
+
+1. Should agents be allowed to edit `workflow_state.json` directly?
+2. Should the orchestrator require `next_state_proposal.json` instead?
+3. What is the minimal safe state schema?
+4. What is the minimal safe config schema?
+5. How should phase transitions be validated?
+6. How should user gates be represented?
+7. How should artifact paths be configured?
+8. How should project detection work?
+9. How should agent CLI adapters be represented?
+10. How should prompts be assembled?
+11. How should stdout/stderr be captured?
+12. How should protected path checks work?
+13. How should allowed change manifests be extracted or represented?
+14. How should review iteration limits work?
+15. What should happen when a command times out?
+16. What should happen when an agent exits with a non-zero code?
+17. What should happen when an agent modifies unauthorized files?
+18. What should happen when tests cannot be run?
+19. What should be included in the first MVP?
+20. What should be deliberately deferred?
+
+## 33. Required Output
+
+Produce the following artifacts in this exact order.
+
+### 33.1 Requirement Understanding
+
+Use this format:
+
+```markdown
+# Requirement Understanding
+
+## Summary
+
+## Product Intent
+
+## Target Users
+
+## Core User Scenarios
+
+## Functional Requirements
+
+## Non-Functional Requirements
+
+## Architecture Requirements
+
+## Security and Safety Requirements
+
+## Configurability Requirements
+
+## Agent Integration Requirements
+
+## In Scope
+
+## Out of Scope
+
+## Confirmed Technical Decisions
+
+## Assumptions
+
+## Risks
+
+## Initial Edge Cases
+
+## Open Questions
+
+## User Decisions Required
+```
+
+### 33.2 Design Options
+
+Use this format:
+
+```markdown
+# Design Options
+
+## Option A
+
+## Option B
+
+## Option C
+
+## Comparison
+
+## Recommended Direction
+
+## Rationale
+```
+
+At minimum, compare:
+
+1. Agents directly edit `workflow_state.json`
+2. Agents write `next_state_proposal.json`; orchestrator owns canonical state
+3. Hybrid model for MVP with validation after each run
+
+### 33.3 Proposed Architecture
+
+Use this format:
+
+```markdown
+# Proposed Architecture
+
+## Overview
+
+## Core Components
+
+## State Machine
+
+## Config System
+
+## Project Adapter Layer
+
+## Agent Adapter Layer
+
+## Prompt Assembly
+
+## Artifact Management
+
+## Guardrail Engine
+
+## Diff Checker
+
+## Logging
+
+## Error Handling
+
+## User Gate Handling
+
+## Extension Points
+```
+
+### 33.4 MVP Plan
+
+Use this format:
+
+```markdown
+# MVP Plan
+
+## Objective
+
+## Non-Goals
+
+## Package / Repository Structure
+
+## Core Modules
+
+## CLI Commands
+
+## Config Schema
+
+## State Schema
+
+## Prompt Templates
+
+## Guardrails Included in MVP
+
+## Tests
+
+## Acceptance Criteria
+
+## Risks
+
+## Deferred Features
+```
+
+### 33.5 First Task Plan
+
+Use this format:
+
+```markdown
+# First Task Plan
+
+## Task ID
+
+## Task Objective
+
+## Why This Task Comes First
+
+## Preconditions
+
+## Files to Inspect
+
+## Files to Create
+
+## Files to Modify
+
+## Expected Changes by File
+
+## Commands to Run
+
+## Acceptance Criteria
+
+## Automated Verification
+
+## User Verification Points
+
+## Rollback / Recovery Considerations
+
+## Risks and Edge Cases
+
+## Non-Goals
+
+## Stop Condition
+```
+
+The Stop Condition must say:
+
+```markdown
+Stop after writing this Plan. Do not implement until the user explicitly approves this Plan.
+```
+
+## 34. Review Requirements
+
+The design should be ready for review by another agent.
+
+The review agent should check:
+
+* Whether the design preserves user gates
+* Whether the orchestrator remains deterministic
+* Whether repository structure is configurable
+* Whether project-specific assumptions are avoided
+* Whether agent adapters are extensible
+* Whether protected paths are handled safely
+* Whether Plan deviation is blocked
+* Whether unauthorized file changes are detected
+* Whether the MVP is small enough
+* Whether the first task is safe and foundational
+* Whether user decisions are clearly separated
+
+## 35. Final Instructions
+
+Do not implement anything yet.
+
+Do not edit files.
+
+Do not create commits.
+
+Do not run destructive commands.
+
+Do not assume a fixed project structure.
+
+Do not assume a fixed package manager.
+
+Do not assume only Codex and Claude Code will ever be supported.
+
+Do not design uncontrolled full automation as the default.
+
+Prioritize:
+
+1. Deterministic orchestration
+2. Configurability
+3. User gates
+4. Guardrails
+5. Clear artifacts
+6. Safe MVP scope
+7. Extensible adapters
+8. Reviewable design
