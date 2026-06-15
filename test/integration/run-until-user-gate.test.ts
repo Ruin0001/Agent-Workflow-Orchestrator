@@ -141,6 +141,7 @@ test("run-until-user-gate stops cleanly on an active explicit gate without invok
   const state = await readWorkflowState(workspace);
   state.gates.approval = { active: true, reason: "Need approval" };
   await writeWorkflowState(workspace, state);
+  const before = await readWorkflowState(workspace);
 
   const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
 
@@ -149,7 +150,7 @@ test("run-until-user-gate stops cleanly on an active explicit gate without invok
   assert.match(result.stdout.join("\n"), /Stopped at user gate: approval/);
   assert.match(result.stdout.join("\n"), /Steps run: 0/);
   assert.deepEqual(await invocationMarkers(workspace), []);
-  assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
+  assert.deepEqual(await readWorkflowState(workspace), before);
 });
 
 test("run-until-user-gate stops immediately when workflow is done", async () => {
@@ -160,6 +161,7 @@ test("run-until-user-gate stops immediately when workflow is done", async () => 
   state.currentActor = "none";
   state.nextActor = "none";
   await writeWorkflowState(workspace, state);
+  const before = await readWorkflowState(workspace);
 
   const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
 
@@ -168,6 +170,7 @@ test("run-until-user-gate stops immediately when workflow is done", async () => 
   assert.match(result.stdout.join("\n"), /Workflow already done/);
   assert.match(result.stdout.join("\n"), /Steps run: 0/);
   assert.deepEqual(await invocationMarkers(workspace), []);
+  assert.deepEqual(await readWorkflowState(workspace), before);
 });
 
 test("run-until-user-gate preserves next errors with run summary details", async () => {
