@@ -136,6 +136,40 @@ test("run-until-user-gate stops immediately when already at a user phase", async
   assert.deepEqual(await readWorkflowState(workspace), before);
 });
 
+test("run-until-user-gate stops cleanly on an active explicit gate without invoking the agent", async () => {
+  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
+  const state = await readWorkflowState(workspace);
+  state.gates.approval = { active: true, reason: "Need approval" };
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(result.stderr, []);
+  assert.match(result.stdout.join("\n"), /Stopped at user gate: approval/);
+  assert.match(result.stdout.join("\n"), /Steps run: 0/);
+  assert.deepEqual(await invocationMarkers(workspace), []);
+  assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
+});
+
+test("run-until-user-gate stops immediately when workflow is done", async () => {
+  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
+  const state = await readWorkflowState(workspace);
+  state.phase = "done";
+  state.status = "done";
+  state.currentActor = "none";
+  state.nextActor = "none";
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(result.stderr, []);
+  assert.match(result.stdout.join("\n"), /Workflow already done/);
+  assert.match(result.stdout.join("\n"), /Steps run: 0/);
+  assert.deepEqual(await invocationMarkers(workspace), []);
+});
+
 test("run-until-user-gate preserves next errors with run summary details", async () => {
   const workspace = await setupWorkspace("fake-agent-invalid-proposal.mjs");
 
