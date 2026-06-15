@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 
 let prompt = "";
 for await (const chunk of process.stdin) {
@@ -39,7 +40,7 @@ if (step === undefined) {
 }
 
 await mkdir(join(".agent", "artifacts"), { recursive: true });
-await writeFile(join(".agent", `invoked-${phase}-${Date.now()}`), "yes\n", "utf8");
+await writeFile(join(".agent", `invoked-${phase}-${randomUUID()}`), "yes\n", "utf8");
 await writeFile(join(".agent", "artifacts", step.artifactPath), `# ${step.artifactName}\n`, "utf8");
 await writeFile(
   join(".agent", "next_state_proposal.json"),

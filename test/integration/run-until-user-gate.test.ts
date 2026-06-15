@@ -224,6 +224,11 @@ test("run-until-user-gate step limit fails closed without mutating state after e
   const state = await readWorkflowState(workspace);
   assert.equal(state.phase, "spec_review");
   assert.equal(state.currentActor, "review");
+  const markers = await invocationMarkers(workspace);
+  assert.equal(markers.length, 2);
+  assert.equal(markers.some((marker) => marker.startsWith("invoked-requirement_understanding-")), true);
+  assert.equal(markers.some((marker) => marker.startsWith("invoked-spec_creation-")), true);
+  assert.equal(markers.some((marker) => marker.startsWith("invoked-spec_review-")), false);
 });
 
 test("run-until-user-gate rejects invalid maxSteps without invoking the agent", async () => {
