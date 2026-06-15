@@ -180,3 +180,25 @@ test("run-until-user-gate rejects invalid maxSteps without invoking the agent", 
   assert.equal(await exists(join(workspace, ".agent", "invoked")), false);
   assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
 });
+
+test("run-until-user-gate repeats next until the first user-owned phase", async () => {
+  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
+
+  const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(result.stderr, []);
+  const output = result.stdout.join("\n");
+  assert.match(output, /Advanced to spec_creation/);
+  assert.match(output, /Advanced to spec_review/);
+  assert.match(output, /Advanced to user_spec_review/);
+  assert.match(output, /Stopped at user gate: user_spec_review/);
+  assert.match(output, /Steps run: 3/);
+
+  const state = await readWorkflowState(workspace);
+  assert.equal(state.phase, "user_spec_review");
+  assert.equal(state.currentActor, "user");
+  assert.equal(await exists(join(workspace, ".agent", "invoked-requirement_understanding")), true);
+  assert.equal(await exists(join(workspace, ".agent", "invoked-spec_creation")), true);
+  assert.equal(await exists(join(workspace, ".agent", "invoked-spec_review")), true);
+});
