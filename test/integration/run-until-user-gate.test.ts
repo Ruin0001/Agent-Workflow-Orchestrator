@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -111,6 +111,11 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+async function invocationMarkers(workspace: string): Promise<string[]> {
+  const entries = await readdir(join(workspace, ".agent"));
+  return entries.filter((entry) => entry.startsWith("invoked"));
+}
+
 test("run-until-user-gate stops immediately when already at a user phase", async () => {
   const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
   const state = await readWorkflowState(workspace);
@@ -127,7 +132,7 @@ test("run-until-user-gate stops immediately when already at a user phase", async
   assert.deepEqual(result.stderr, []);
   assert.match(result.stdout.join("\n"), /Stopped at user gate: user_spec_review/);
   assert.match(result.stdout.join("\n"), /Steps run: 0/);
-  assert.equal(await exists(join(workspace, ".agent", "invoked")), false);
+  assert.deepEqual(await invocationMarkers(workspace), []);
   assert.deepEqual(await readWorkflowState(workspace), before);
 });
 
@@ -149,7 +154,7 @@ test("run-until-user-gate preserves next errors with run summary details", async
 });
 
 test("run-until-user-gate step limit fails closed after one successful step without extra mutation", async () => {
-  const workspace = await setupWorkspace("fake-agent.mjs");
+  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
 
   const result = await runUntilUserGateCommand({ workspace, maxSteps: 1 });
 
@@ -164,6 +169,8 @@ test("run-until-user-gate step limit fails closed after one successful step with
   const state = await readWorkflowState(workspace);
   assert.equal(state.phase, "spec_creation");
   assert.equal(state.currentActor, "implementation");
+  assert.equal(await exists(join(workspace, ".agent", "invoked-requirement_understanding")), true);
+  assert.equal(await exists(join(workspace, ".agent", "invoked-spec_creation")), false);
 });
 
 test("run-until-user-gate rejects invalid maxSteps without invoking the agent", async () => {
