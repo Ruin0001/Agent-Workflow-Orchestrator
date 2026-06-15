@@ -2,131 +2,123 @@
 
 ## Current Phase
 
-`run-until-user-gate` implementation (plan approved at user_plan_approval).
+`run-until-user-gate` implementation complete; ready for Claude implementation review.
 
 ## Current Status
 
-The plan was reviewed by the Claude Code review session (plan_review: Approved with minor comments, no blocking/major; load-bearing assumptions verified against source). The user CLEARED the `user_plan_approval` gate: approved the plan with push included, and chose subagent-driven execution.
+Codex completed the approved `run-until-user-gate` wave from `.agent/artifacts/run_until_user_gate_plan.md`.
+Final internal implementation review approved the wave as ready for external Claude implementation review.
 
-Plan artifact: `.agent/artifacts/run_until_user_gate_plan.md`.
-Plan review: `.agent/artifacts/run_until_user_gate_plan_review.md`.
-Design + design review: `.agent/artifacts/run_until_user_gate_design.md`, `.agent/artifacts/run_until_user_gate_design_review.md`.
+The user previously cleared the `user_plan_approval` gate for this wave:
+
+- Plan approved.
+- Push included.
+- Execution style: subagent-driven.
 
 Manual handoff mode remains in effect.
 
 ## Previous Actor
 
-User (approved plan)
+Codex (implementation agent)
 
 ## Next Actor
 
-Codex (implementation agent)
+Claude Code review session
 
 ## Current Task
 
-Implement `.agent/artifacts/run_until_user_gate_plan.md` task-by-task (Tasks 1-8) using `superpowers:subagent-driven-development`, with TDD red/green per task and verification before completion. Commit per task and `git push origin main` at Task 8 (push approved). Then hand off to the Claude review session for implementation review.
+Review the `run-until-user-gate` implementation against:
 
-User decisions made at the gate:
-- Plan approved (push included).
-- Execution style: subagent-driven.
-
-Plan review awareness items to honor during implementation:
-- N1: per-task commits + push-before-review are approved.
-- N2: when modifying the existing `args.test.ts` delimiter test, preserve (do not weaken) existing coverage.
-- Keep scope to `run-until-user-gate` only; do NOT start Gate Delegation, add delegation config, `review_verdict.json`, or any gate auto-pass.
-
-## What Was Done
-
-Claude design review:
-
-- Reviewed `.agent/artifacts/run_until_user_gate_design.md`.
-- Approval status: Approved with minor comments.
-- Confirmed the Loop Wrapper approach is aligned with the user's chosen scope.
-- Confirmed no user gate is cleared, skipped, or delegated.
-- Confirmed the `evaluateRunStop()` boundary is a sound migration point for the later Gate Policy Engine.
-- Produced `.agent/artifacts/run_until_user_gate_design_review.md`.
-
-Review findings incorporated into the plan:
-
-- D1: `evaluateRunStop()` stops on active explicit gates, not only `currentActor === "user"`.
-- D2: step limit is a named internal constant, `RUN_UNTIL_USER_GATE_MAX_STEPS = 20`, with rationale and tests.
-- D3: `nextCommand()` failures preserve the original error code and attach run summary details.
-- D4: tests cover no extra mutation on step-limit exhaustion, review back-edge traversal, and iteration-limit exhaustion.
-- D5: iteration-limit exhaustion is documented and tested as a fail-closed error stop requiring user attention.
-
-Plan created:
-
-- `.agent/artifacts/run_until_user_gate_plan.md`
-
-## Artifacts Created or Updated
-
-- Created `.agent/artifacts/run_until_user_gate_design_review.md`
-- Created `.agent/artifacts/run_until_user_gate_plan.md`
-- Updated `.agent/handoff.md`
-
-## Files Changed Since Last Pushed Commit
-
+- `.agent/artifacts/run_until_user_gate_design.md`
 - `.agent/artifacts/run_until_user_gate_design_review.md`
 - `.agent/artifacts/run_until_user_gate_plan.md`
+- `.agent/artifacts/run_until_user_gate_implementation_notes.md`
+- `.agent/artifacts/test_results.md`
+
+## Implementation Summary
+
+Implemented `agent-flow run-until-user-gate` as a bounded loop over the existing `nextCommand()` path.
+
+Key properties:
+
+- No user gate is cleared, skipped, or delegated.
+- `runUntilUserGateCommand()` reuses `nextCommand()` instead of duplicating agent invocation, proposal validation, guardrails, lock handling, run logs, or state advancement.
+- `evaluateRunStop()` is a pure boundary in `src/workflow/run-stop.ts`.
+- `evaluateRunStop()` stops on:
+  - `done`
+  - user-owned phases
+  - active explicit gates in `state.gates`
+- `RUN_UNTIL_USER_GATE_MAX_STEPS` is set to 20.
+- `nextCommand()` failures preserve the original error code and include `details.runUntilUserGate`.
+- No public config field, delegation profile, `review_verdict.json`, or gate auto-pass behavior was added.
+
+## Files Created or Updated
+
+Implementation:
+
+- `src/workflow/run-stop.ts`
+- `src/commands/run-until-user-gate.ts`
+- `src/cli/args.ts`
+- `src/cli/main.ts`
+- `src/cli/output.ts`
+
+Tests and fixtures:
+
+- `test/unit/run-stop.test.ts`
+- `test/unit/args.test.ts`
+- `test/unit/output.test.ts`
+- `test/integration/run-until-user-gate.test.ts`
+- `test/fixtures/fake-agent-run-until-sequence.mjs`
+- `test/fixtures/fake-agent-run-until-cycle.mjs`
+- `test/fixtures/fake-agent-iteration-limit.mjs`
+
+Artifacts:
+
+- `.agent/artifacts/run_until_user_gate_implementation_notes.md`
+- `.agent/artifacts/test_results.md`
 - `.agent/handoff.md`
 
-## Commands / Checks Run
+## Verification
 
-- Read `.agent/handoff.md`.
-- Read `.agent/artifacts/run_until_user_gate_design_review.md`.
-- Read `.agent/artifacts/run_until_user_gate_design.md`.
-- Inspected current source needed for plan accuracy:
-  - `src/cli/args.ts`
-  - `src/cli/main.ts`
-  - `src/cli/output.ts`
-  - `src/state/schema.ts`
-  - `src/state/store.ts`
-  - `src/workflow/actors.ts`
-  - `src/workflow/gates.ts`
-  - `src/workflow/transitions.ts`
-  - `src/prompts/render.ts`
-  - current integration/unit test patterns
-- Self-reviewed `.agent/artifacts/run_until_user_gate_plan.md` for placeholders, scope creep, D1-D5 coverage, and type-name consistency.
+Run on 2026-06-16:
 
-No build/test verification was run because no implementation code changed. Plan-only artifact creation does not require build execution.
+- `npm run build`: pass, `tsc -p tsconfig.json` exited 0.
+- `npm run typecheck`: pass, `tsc -p tsconfig.json --noEmit` exited 0.
+- `npm test`: pass with existing Windows symlink skips; 127 tests, 125 pass, 0 fail, 2 skipped.
 
-## Plan Summary
+## Review Focus
 
-The plan is TDD-oriented and split into eight tasks:
+Claude should review:
 
-1. Add `src/workflow/run-stop.ts` and stop-decision unit tests.
-2. Add CLI parser/help support.
-3. Add `src/commands/run-until-user-gate.ts` and dispatch.
-4. Cover normal multi-step stop at first user gate.
-5. Cover active gate, done, and original error-code preservation.
-6. Cover step-limit fail-closed behavior.
-7. Cover review back-edge and iteration-limit stops.
-8. Run final verification and hand off for Claude implementation review.
+- No user gate is cleared, skipped, or delegated.
+- `runUntilUserGateCommand()` reuses `nextCommand()` rather than duplicating guardrails.
+- `evaluateRunStop()` handles active explicit gates before invoking another agent step.
+- Original `nextCommand()` error codes are preserved.
+- Step-limit exhaustion is fail-closed and performs no extra mutation after the limit.
+- Review back-edges and iteration-limit exhaustion are covered.
+- Scope stayed limited to `run-until-user-gate`; Gate Delegation did not start.
 
-The plan explicitly stops after implementation review handoff and forbids starting Gate Delegation in this wave.
+## Commit / Push Status
+
+Implementation commits are on `main` and intended to be pushed to `origin/main` after the final documentation commit.
 
 ## Known Risks / Residuals
 
-- IR-M6 symlink guardrail tests are still unverified on this Windows environment.
+- The two symlink guardrail tests remain skipped in this Windows environment because symlink creation is not permitted here. This is pre-existing and unrelated to the run-until wave.
 - `blockedCommands` enforcement remains scoped to the configured command the orchestrator spawns, not subprocesses inside a real agent.
-- Agent `env` remains deferred; do not add it in this wave unless the user explicitly changes scope.
-- Deferred MVP minors remain available as future cleanup, but the user selected `run-until-user-gate` only for this wave.
+- Agent `env` remains deferred.
 
 ## User Decisions Required
 
-None — the user_plan_approval gate is cleared (plan approved, push included, subagent-driven execution).
-
-## Next Required Action
-
-Codex implements `.agent/artifacts/run_until_user_gate_plan.md` task-by-task with `superpowers:subagent-driven-development` (TDD per task, verification before completion), committing per task and pushing at Task 8. On completion, Codex hands off to the Claude review session for the implementation review of this wave.
+None for this handoff. The next required action is Claude implementation review.
 
 ---
 
 # Queued Future-Wave Handoff: Gate Delegation Design (NOT part of the current wave)
 
-The approved design for a future `agent-flow` feature — gate delegation (per-project autonomy profile) — remains queued. It must NOT be implemented in the `run-until-user-gate` wave.
+The approved design for a future `agent-flow` feature, gate delegation, remains queued. It must NOT be implemented as part of the `run-until-user-gate` review.
 
 - Design document: `.agent/proposals/2026-06-14-gate-delegation-design.md`
 - Summary: per-project opt-in (default OFF) to auto-pass selected user gates (`user_plan_approval`, `user_verification`, review-iteration convergence) at a STRICT bar (review verdict `Approved` with 0 Blocking / 0 Major), while a compiled-in hard floor and `user_spec_review` always stop for the user.
-- Sequencing: MVP → `run-until-user-gate` wave → machine-readable `review_verdict.json` if needed → gate-delegation wave.
-- The `run-until-user-gate` plan keeps the stop-decision boundary so this later policy engine can be added without rewriting the command loop.
+- Sequencing: MVP -> `run-until-user-gate` wave -> machine-readable `review_verdict.json` if needed -> gate-delegation wave.
+- The `run-until-user-gate` implementation keeps the stop-decision boundary so this later policy engine can be added without rewriting the command loop.

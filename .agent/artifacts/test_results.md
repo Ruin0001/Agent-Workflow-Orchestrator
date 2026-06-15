@@ -45,6 +45,42 @@ Both symlink tests were skipped because this Windows environment did not permit 
 - Task 8 spec compliance review: approved after dependency, untracked-line, and post-run guardrail fixes.
 - Task 8 code quality review: approved after fail-closed path, rename, case-sensitive manifest, line-count, dependency, and rename-scope fixes.
 
+## Run-Until-User-Gate Wave Verification
+
+Date: 2026-06-16
+
+- `npm run build`
+  - Result: pass
+  - Evidence: `tsc -p tsconfig.json` exited 0.
+- `npm run typecheck`
+  - Result: pass
+  - Evidence: `tsc -p tsconfig.json --noEmit` exited 0.
+- `npm test`
+  - Result: pass with existing symlink platform skips on Windows
+  - Evidence: 127 tests, 125 pass, 0 fail, 2 skipped.
+
+Coverage added:
+
+- stop-decision unit tests, including active explicit gates
+- CLI parser/help coverage for `run-until-user-gate`
+- immediate stop at user phase and done
+- repeated `nextCommand()` execution until user phase
+- active explicit gate stop without agent invocation
+- original next error-code preservation with run summary details
+- step-limit fail-closed behavior
+- review back-edge traversal
+- iteration-limit exhaustion fail-closed behavior
+
+Run-until task reviews:
+
+- Task 1 stop-decision boundary: spec and code-quality reviews approved.
+- Task 2 CLI parser/help: spec review approved; code-quality review approved after delimiter parser coverage was strengthened.
+- Task 3 command loop: spec review approved after error-summary, step-limit code, and unchanged-state fixes; code-quality review approved after step-limit hardening.
+- Task 4 normal multi-step stop: spec review approved; code-quality review approved after integration assertions were strengthened.
+- Task 5 active gate, done, error preservation: spec review approved; code-quality review approved after immediate-stop full-state preservation assertions were added.
+- Task 6 step-limit fail-closed behavior: spec review approved; code-quality review approved after deterministic invocation-order assertions were added.
+- Task 7 review back-edge and iteration-limit stops: spec review approved; code-quality review approved after marker and full-state no-mutation assertions were added.
+
 ## User Verification Items
 
 - Run `agent-flow init` in a disposable workspace and inspect created files.
