@@ -271,3 +271,47 @@ test("run-until-user-gate repeats next until the first user-owned phase", async 
   assert.equal(await exists(join(workspace, ".agent", "invoked-spec_creation")), true);
   assert.equal(await exists(join(workspace, ".agent", "invoked-spec_review")), true);
 });
+
+test("run-until-user-gate handles a review back-edge before reaching a user gate", async () => {
+  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
+  const state = await readWorkflowState(workspace);
+  state.phase = "spec_review_response";
+  state.status = "ready";
+  state.currentActor = "implementation";
+  state.nextActor = "implementation";
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  const output = result.stdout.join("\n");
+  assert.match(output, /Advanced to spec_review/);
+  assert.match(output, /Advanced to user_spec_review/);
+  assert.match(output, /Stopped at user gate: user_spec_review/);
+  assert.match(output, /Steps run: 2/);
+  assert.equal((await readWorkflowState(workspace)).phase, "user_spec_review");
+});
+
+test("run-until-user-gate surfaces iteration-limit exhaustion as a fail-closed stop", async () => {
+  const workspace = await setupWorkspace("fake-agent-iteration-limit.mjs");
+  const state = await readWorkflowState(workspace);
+  state.phase = "spec_review_response";
+  state.status = "ready";
+  state.currentActor = "implementation";
+  state.nextActor = "implementation";
+  state.iterationCounters.spec_review = state.limits.maxSpecReviewIterations;
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 1);
+  const errorText = result.stderr.join("\n");
+  assert.match(errorText, /ITERATION_LIMIT_EXCEEDED/);
+  assert.match(errorText, /run-until-user-gate stopped after 0 steps/i);
+  const finalState = await readWorkflowState(workspace);
+  assert.equal(finalState.phase, "spec_review_response");
+  assert.equal(
+    finalState.iterationCounters.spec_review,
+    finalState.limits.maxSpecReviewIterations,
+  );
+});
