@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -40,6 +40,7 @@ if (step === undefined) {
 }
 
 await mkdir(join(".agent", "artifacts"), { recursive: true });
+await appendFile(join(".agent", "cycle-invocations.log"), `${phase}\n`, "utf8");
 await writeFile(join(".agent", `invoked-${phase}-${randomUUID()}`), "yes\n", "utf8");
 await writeFile(join(".agent", "artifacts", step.artifactPath), `# ${step.artifactName}\n`, "utf8");
 await writeFile(

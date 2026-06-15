@@ -229,6 +229,10 @@ test("run-until-user-gate step limit fails closed without mutating state after e
   assert.equal(markers.some((marker) => marker.startsWith("invoked-requirement_understanding-")), true);
   assert.equal(markers.some((marker) => marker.startsWith("invoked-spec_creation-")), true);
   assert.equal(markers.some((marker) => marker.startsWith("invoked-spec_review-")), false);
+  const invocationOrder = (await readFile(join(workspace, ".agent", "cycle-invocations.log"), "utf8"))
+    .trim()
+    .split(/\r?\n/);
+  assert.deepEqual(invocationOrder, ["requirement_understanding", "spec_creation"]);
 });
 
 test("run-until-user-gate rejects invalid maxSteps without invoking the agent", async () => {
