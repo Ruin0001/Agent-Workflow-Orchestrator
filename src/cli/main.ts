@@ -5,6 +5,7 @@ import { initCommand } from "../commands/init.js";
 import { statusCommand } from "../commands/status.js";
 import { configValidateCommand } from "../commands/config-validate.js";
 import { nextCommand } from "../commands/next.js";
+import runUntilUserGateCommand from "../commands/run-until-user-gate.js";
 import { ok, type Result } from "../core/result.js";
 
 async function dispatch(command: CliCommand): Promise<Result<string>> {
@@ -21,7 +22,7 @@ async function dispatch(command: CliCommand): Promise<Result<string>> {
     case "next":
       return nextCommand(commandOptions(command));
     case "run-until-user-gate":
-      return ok(helpText());
+      return runUntilUserGateCommand(commandOptions(command));
     case "help":
       return ok(helpText());
   }
