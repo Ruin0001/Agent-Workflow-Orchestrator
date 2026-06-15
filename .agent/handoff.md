@@ -2,11 +2,11 @@
 
 ## Current Phase
 
-User verification
+User verification complete (functional items PASS; one platform residual)
 
 ## Current Status
 
-The implementation review iteration has converged. Re-review approval status: Approved with minor comments. All Blocking and Major findings are resolved and verified in code; the reviewer independently ran the test suite (110 tests, 108 pass, 0 fail, 2 platform-skipped). The workflow is now at the `user_verification` gate. Manual handoff mode remains in effect.
+The implementation review iteration converged (Approved with minor comments) and the `user_verification` gate has now been exercised by the review session on the user's behalf. Functional items 1-3 (init/status/config-validate; one assisted `next`; protected-path block in a Git workspace) PASS via live runs. Item 4 (IR-M6 symlink suite) remains a platform residual — symlink creation needs Administrator/Developer-Mode Windows or Linux CI. Results: `.agent/artifacts/user_verification_results.md`. The project is now a Git repository (created/pushed via a Codex session). Manual handoff mode remains in effect.
 
 This handoff also carries a queued FUTURE-WAVE design (gate delegation) — see the clearly separated section near the end. It is NOT part of the current cycle.
 
@@ -73,7 +73,12 @@ This is the `user_verification` gate. Per the Spec and the open items:
 
 ## Next Required Action
 
-User runs the verification steps above and clears the gate. After verification, the workflow proceeds to `final_handoff` / `done`, or to planning the next wave (`run-until-user-gate`, which is the prerequisite for the queued gate-delegation design).
+The user_verification gate is functionally cleared (items 1-3 PASS; item 4 is a platform residual to run on a symlink-capable host). The user decides the next step:
+
+- (a) Proceed to `final_handoff` → `done` for the MVP (Codex produces the final handoff), or
+- (b) Begin planning the next wave: `run-until-user-gate` (the prerequisite for the queued gate-delegation design), restarting the standard workflow (Requirement Understanding / Spec) for that wave.
+
+Either path resumes the normal Codex↔Claude handoff. The IR-M6 symlink run and the deferred Minors (IR-m1..m7, agent `env`) can be scheduled into whichever wave is convenient.
 
 ---
 
