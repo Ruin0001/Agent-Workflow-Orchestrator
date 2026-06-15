@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { main } from "../../src/cli/main.js";
 import { initCommand } from "../../src/commands/init.js";
+import { runUntilUserGateCommand } from "../../src/commands/run-until-user-gate.js";
 import { validateState, type WorkflowState } from "../../src/state/schema.js";
 
 async function tempWorkspace(): Promise<string> {
@@ -118,6 +119,7 @@ test("run-until-user-gate stops immediately when already at a user phase", async
   state.currentActor = "user";
   state.nextActor = "user";
   await writeWorkflowState(workspace, state);
+  const before = await readWorkflowState(workspace);
 
   const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
 
@@ -126,5 +128,38 @@ test("run-until-user-gate stops immediately when already at a user phase", async
   assert.match(result.stdout.join("\n"), /Stopped at user gate: user_spec_review/);
   assert.match(result.stdout.join("\n"), /Steps run: 0/);
   assert.equal(await exists(join(workspace, ".agent", "invoked")), false);
-  assert.equal((await readWorkflowState(workspace)).phase, "user_spec_review");
+  assert.deepEqual(await readWorkflowState(workspace), before);
+});
+
+test("run-until-user-gate preserves next errors with run summary details", async () => {
+  const workspace = await setupWorkspace("fake-agent-invalid-proposal.mjs");
+
+  const result = await runUntilUserGateCommand({ workspace });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.notEqual(result.error.code, "RUN_UNTIL_STEP_LIMIT");
+    assert.match(result.error.message, /run-until-user-gate stopped after 0 steps/i);
+    assert.deepEqual(result.error.details?.runUntilUserGate, {
+      stepsRun: 0,
+      lastPhase: "requirement_understanding",
+      lastActor: "implementation",
+    });
+  }
+});
+
+test("run-until-user-gate reports RUN_UNTIL_STEP_LIMIT on step exhaustion", async () => {
+  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
+
+  const result = await runUntilUserGateCommand({ workspace, maxSteps: 0 });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.code, "RUN_UNTIL_STEP_LIMIT");
+    assert.equal(result.error.details?.stepsRun, 0);
+    assert.equal(result.error.details?.lastPhase, "requirement_understanding");
+    assert.equal(result.error.details?.lastActor, "implementation");
+    assert.equal(result.error.details?.maxSteps, 0);
+  }
+  assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
 });
