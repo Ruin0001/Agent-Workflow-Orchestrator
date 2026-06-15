@@ -96,6 +96,17 @@ test("treats tokens after delimiter as positionals", () => {
   }
 });
 
+test("treats flag-shaped tokens after delimiter as positionals", () => {
+  const result = parseArgs(["--", "--verbose"]);
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.code, "USAGE_ERROR");
+    assert.match(result.error.message, /Unknown command: --verbose/);
+    assert.doesNotMatch(result.error.message, /Unknown flag/);
+  }
+});
+
 test("returns usage error for unknown commands", () => {
   const result = parseArgs(["not-a-command"]);
 
