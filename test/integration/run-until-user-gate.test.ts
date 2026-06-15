@@ -289,7 +289,13 @@ test("run-until-user-gate handles a review back-edge before reaching a user gate
   assert.match(output, /Advanced to user_spec_review/);
   assert.match(output, /Stopped at user gate: user_spec_review/);
   assert.match(output, /Steps run: 2/);
-  assert.equal((await readWorkflowState(workspace)).phase, "user_spec_review");
+  const finalState = await readWorkflowState(workspace);
+  assert.equal(finalState.phase, "user_spec_review");
+  assert.equal(finalState.currentActor, "user");
+  const markers = (await invocationMarkers(workspace)).sort();
+  assert.deepEqual(markers, ["invoked-spec_review", "invoked-spec_review_response"]);
+  assert.equal(await exists(join(workspace, ".agent", "invoked-requirement_understanding")), false);
+  assert.equal(await exists(join(workspace, ".agent", "invoked-spec_creation")), false);
 });
 
 test("run-until-user-gate surfaces iteration-limit exhaustion as a fail-closed stop", async () => {
@@ -301,6 +307,7 @@ test("run-until-user-gate surfaces iteration-limit exhaustion as a fail-closed s
   state.nextActor = "implementation";
   state.iterationCounters.spec_review = state.limits.maxSpecReviewIterations;
   await writeWorkflowState(workspace, state);
+  const before = await readWorkflowState(workspace);
 
   const result = await captureMain(["--workspace", workspace, "run-until-user-gate"]);
 
@@ -309,9 +316,5 @@ test("run-until-user-gate surfaces iteration-limit exhaustion as a fail-closed s
   assert.match(errorText, /ITERATION_LIMIT_EXCEEDED/);
   assert.match(errorText, /run-until-user-gate stopped after 0 steps/i);
   const finalState = await readWorkflowState(workspace);
-  assert.equal(finalState.phase, "spec_review_response");
-  assert.equal(
-    finalState.iterationCounters.spec_review,
-    finalState.limits.maxSpecReviewIterations,
-  );
+  assert.deepEqual(finalState, before);
 });
