@@ -39,6 +39,15 @@ test("parses next command", () => {
   }
 });
 
+test("parses run-until-user-gate command", () => {
+  const result = parseArgs(["run-until-user-gate"]);
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.name, "run-until-user-gate");
+  }
+});
+
 test("parses config and workspace path flags", () => {
   const result = parseArgs([
     "status",
@@ -78,17 +87,17 @@ test("returns usage error for unknown flags", () => {
 });
 
 test("treats tokens after delimiter as positionals", () => {
-  const result = parseArgs(["--", "run-until-user-gate"]);
+  const result = parseArgs(["--", "not-a-command"]);
 
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.equal(result.error.code, "USAGE_ERROR");
-    assert.match(result.error.message, /Unknown command: run-until-user-gate/);
+    assert.match(result.error.message, /Unknown command: not-a-command/);
   }
 });
 
 test("returns usage error for unknown commands", () => {
-  const result = parseArgs(["run-until-user-gate"]);
+  const result = parseArgs(["not-a-command"]);
 
   assert.equal(result.ok, false);
   if (!result.ok) {

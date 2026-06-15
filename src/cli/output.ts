@@ -18,6 +18,7 @@ export function helpText(): string {
     "  status",
     "  config validate",
     "  next",
+    "  run-until-user-gate",
     "  help",
     "",
     "Flags:",

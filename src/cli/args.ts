@@ -8,6 +8,7 @@ export type CliCommand =
   | { name: "status"; flags: CliFlags }
   | { name: "config-validate"; flags: CliFlags }
   | { name: "next"; flags: CliFlags }
+  | { name: "run-until-user-gate"; flags: CliFlags }
   | { name: "help"; flags: CliFlags };
 
 const stringFlags = new Set(["config", "workspace"]);
@@ -78,6 +79,10 @@ function parseCommand(positionals: string[], flags: CliFlags): Result<CliCommand
 
   if (command === "next" && positionals.length === 1) {
     return ok({ name: "next", flags });
+  }
+
+  if (command === "run-until-user-gate" && positionals.length === 1) {
+    return ok({ name: "run-until-user-gate", flags });
   }
 
   if (command === "help" && positionals.length <= 1) {

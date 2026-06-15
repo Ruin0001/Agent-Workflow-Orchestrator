@@ -20,6 +20,8 @@ async function dispatch(command: CliCommand): Promise<Result<string>> {
       });
     case "next":
       return nextCommand(commandOptions(command));
+    case "run-until-user-gate":
+      return ok(helpText());
     case "help":
       return ok(helpText());
   }
