@@ -1,6 +1,7 @@
 import { isAbsolute, join } from "node:path";
 import { DEFAULT_CONFIG_FILE } from "../config/defaults.js";
 import { loadConfig } from "../config/load.js";
+import { validationError } from "../core/errors.js";
 import { err, ok, type AppError, type Result } from "../core/result.js";
 import { readState } from "../state/store.js";
 import { evaluateRunStop, type RunStopDecision } from "../workflow/run-stop.js";
@@ -17,6 +18,11 @@ export type RunUntilUserGateOptions = {
 export async function runUntilUserGateCommand(
   options: RunUntilUserGateOptions = {},
 ): Promise<Result<string>> {
+  const maxSteps = options.maxSteps ?? RUN_UNTIL_USER_GATE_MAX_STEPS;
+  if (!Number.isFinite(maxSteps) || !Number.isInteger(maxSteps) || maxSteps < 0) {
+    return err(validationError("$.maxSteps", "maxSteps must be a non-negative integer"));
+  }
+
   const workspace = options.workspace ?? process.cwd();
   const configPath = options.configPath ?? DEFAULT_CONFIG_FILE;
   const loadedConfig = await loadConfig({ cwd: workspace, configPath });
@@ -25,7 +31,6 @@ export async function runUntilUserGateCommand(
   const config = loadedConfig.value;
   const statePath = resolvePath(workspace, join(config.workspace.stateDir, "workflow_state.json"));
   const stepResults: string[] = [];
-  const maxSteps = options.maxSteps ?? RUN_UNTIL_USER_GATE_MAX_STEPS;
 
   for (let stepsRun = 0; stepsRun < maxSteps; stepsRun += 1) {
     const stateResult = await readState(statePath);

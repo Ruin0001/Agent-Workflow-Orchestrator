@@ -148,18 +148,35 @@ test("run-until-user-gate preserves next errors with run summary details", async
   }
 });
 
-test("run-until-user-gate reports RUN_UNTIL_STEP_LIMIT on step exhaustion", async () => {
-  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
+test("run-until-user-gate step limit fails closed after one successful step without extra mutation", async () => {
+  const workspace = await setupWorkspace("fake-agent.mjs");
 
-  const result = await runUntilUserGateCommand({ workspace, maxSteps: 0 });
+  const result = await runUntilUserGateCommand({ workspace, maxSteps: 1 });
 
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.equal(result.error.code, "RUN_UNTIL_STEP_LIMIT");
-    assert.equal(result.error.details?.stepsRun, 0);
-    assert.equal(result.error.details?.lastPhase, "requirement_understanding");
+    assert.equal(result.error.details?.stepsRun, 1);
+    assert.equal(result.error.details?.lastPhase, "spec_creation");
     assert.equal(result.error.details?.lastActor, "implementation");
-    assert.equal(result.error.details?.maxSteps, 0);
+    assert.equal(result.error.details?.maxSteps, 1);
   }
+  const state = await readWorkflowState(workspace);
+  assert.equal(state.phase, "spec_creation");
+  assert.equal(state.currentActor, "implementation");
+});
+
+test("run-until-user-gate rejects invalid maxSteps without invoking the agent", async () => {
+  const workspace = await setupWorkspace("fake-agent.mjs");
+
+  const result = await runUntilUserGateCommand({ workspace, maxSteps: -1 });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.code, "VALIDATION_ERROR");
+    assert.equal(result.error.path, "$.maxSteps");
+    assert.match(result.error.message, /non-negative integer/);
+  }
+  assert.equal(await exists(join(workspace, ".agent", "invoked")), false);
   assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
 });
