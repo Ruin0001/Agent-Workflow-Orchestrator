@@ -2,93 +2,164 @@
 
 ## Current Phase
 
-User verification complete (functional items PASS; one platform residual)
+`run-until-user-gate` design complete; ready for Claude review.
 
 ## Current Status
 
-The implementation review iteration converged (Approved with minor comments) and the `user_verification` gate has now been exercised by the review session on the user's behalf. Functional items 1-3 (init/status/config-validate; one assisted `next`; protected-path block in a Git workspace) PASS via live runs. Item 4 (IR-M6 symlink suite) remains a platform residual — symlink creation needs Administrator/Developer-Mode Windows or Linux CI. Results: `.agent/artifacts/user_verification_results.md`. The project is now a Git repository (created/pushed via a Codex session). Manual handoff mode remains in effect.
+The MVP cycle is functionally complete. Implementation review converged, user verification items 1-3 passed via live reviewer-run checks, and the remaining IR-M6 symlink check is a platform residual requiring Linux CI or a symlink-privileged Windows session.
 
-This handoff also carries a queued FUTURE-WAVE design (gate delegation) — see the clearly separated section near the end. It is NOT part of the current cycle.
+The user has started the next wave and explicitly selected the narrow scope: implement `run-until-user-gate` only. The user chose the Loop Wrapper approach: stop at every `user` actor phase now, while keeping a small internal stop-decision boundary so the near-term Gate Policy Engine / delegation wave can be added quickly later.
+
+Design artifact: `.agent/artifacts/run_until_user_gate_design.md`.
+
+Manual handoff mode remains in effect.
 
 ## Previous Actor
 
-Claude Code review session
+Codex
 
 ## Next Actor
 
-User
+Claude Code review session
 
 ## Current Task
 
-User performs final verification of the MVP, then decides whether to proceed (GitHub preservation, the symlink-platform check, or the next planned wave).
+Review `.agent/artifacts/run_until_user_gate_design.md` for correctness, scope control, safety, and readiness for implementation planning.
+
+The review should answer:
+
+- Is the design aligned with the user's chosen scope: `run-until-user-gate` only?
+- Does it preserve the rule that no user gate is cleared, skipped, or delegated in this wave?
+- Is the proposed `evaluateRunStop()` boundary enough to support fast migration toward the later Gate Policy Engine without prematurely implementing delegation?
+- Are the testing and acceptance criteria sufficient?
+- Are any deferred MVP minor issues required before this wave can proceed?
+
+If approved, hand back for implementation-plan creation. Do not implement the command in the review session unless the user explicitly redirects.
 
 ## What Was Done
 
-The review session re-reviewed `.agent/artifacts/implementation_review_response.md` by verifying each accepted fix directly in the source (redact.ts, policy.ts, path-patterns.ts, next.ts) rather than trusting the response, and independently ran `npm test`.
+MVP prior state:
 
-Result: all round-1 Blocking/Major items resolved and verified. IR-M6 (symlink tests) is a legitimate platform-verification item, converted to a user-verification requirement. Approval: Approved with minor comments. Full verdict: `.agent/artifacts/implementation_review_2.md`.
+- Implementation review iteration 2 approved the MVP with minor comments.
+- User verification results were produced at `.agent/artifacts/user_verification_results.md`.
+- Functional user-verification items 1-3 passed:
+  - `agent-flow init`, `status`, and `config validate`
+  - one assisted `agent-flow next`
+  - protected-path guardrail blocking in a Git workspace
+- IR-M6 symlink tests remain platform-skipped on this Windows environment.
+- The project was initialized as a Git repository and pushed to GitHub:
+  - `https://github.com/Ruin0001/Agent-Workflow-Orchestrator`
 
-Verified fixes: IR-B1 (redaction families), IR-M1 (forbiddenPaths case-insensitive), IR-M2 (correct recursive globstar, no fail-open, verified carefully), IR-M3 (outcome-aware rich audit log), IR-M4 (no return-in-finally; committed advance preserved), IR-M5 (dirty-tree test), IR-M7 (blockedCommands pre-invocation check).
+Next-wave design work:
+
+- User requested "다음 wave 착수".
+- Handoff indicated the next planned wave is `run-until-user-gate`; Gate Delegation remains future-wave only.
+- Codex used the brainstorming flow and asked the user to choose the stop behavior.
+- User selected:
+  - stop at every `user` actor phase
+  - do not implement selective gate continuation in this wave
+  - keep design ready for near-term migration to the Gate Policy Engine
+- Codex proposed three approaches:
+  - Loop Wrapper
+  - Shared Executor
+  - Gate Policy Engine first
+- User approved Loop Wrapper with future migration awareness.
+- Codex wrote and self-reviewed `.agent/artifacts/run_until_user_gate_design.md`.
+- The design was committed and pushed:
+  - `1103876 Add run-until-user-gate design`
 
 ## Artifacts Created or Updated
 
-- Created `.agent/artifacts/implementation_review_2.md`
+- Created `.agent/artifacts/run_until_user_gate_design.md`
+- Created `.agent/artifacts/user_verification_results.md`
 - Updated `.agent/handoff.md`
 
-## Files Changed
+## Files Changed Since Previous Pushed MVP Snapshot
 
-- `.agent/artifacts/implementation_review_2.md`
+- `.agent/artifacts/run_until_user_gate_design.md`
+- `.agent/artifacts/user_verification_results.md`
 - `.agent/handoff.md`
 
-## Commands Run
+## Commands / Checks Run
 
-- Read `implementation_review_response.md` and directly verified `redact.ts`, `policy.ts`, `path-patterns.ts` (incl. `matchSegments`), `next.ts`.
-- `npm test` (reviewer-run): 110 tests, 108 pass, 0 fail, 2 skipped (symlink/platform).
+For the `run-until-user-gate` design handoff:
 
-## User Verification Required
+- Read `.agent/handoff.md`
+- Read `.agent/artifacts/implementation_review_2.md`
+- Read `.agent/artifacts/user_verification_results.md`
+- Read `.agent/proposals/2026-06-14-gate-delegation-design.md` by targeted search for sequencing/context
+- Read current CLI/command/workflow source by targeted search
+- Self-reviewed `.agent/artifacts/run_until_user_gate_design.md` for placeholders, ambiguity, scope creep, and contradictions
+- Committed and pushed the design artifact
 
-This is the `user_verification` gate. Per the Spec and the open items:
+No implementation code has been changed for this wave yet.
 
-1. Run `agent-flow init` in a disposable workspace and inspect the created files.
-2. Configure a real implementation agent command and run one assisted `agent-flow next` phase.
-3. In a disposable Git workspace, verify protected-path guardrails block unauthorized changes that matter to your workflow.
-4. IR-M6: run the full test suite once on a symlink-capable platform (Linux CI or a symlink-privileged Windows session) so the two skipped symlink guardrail tests actually execute.
+## Design Summary For Review
 
-## Known Risks
+Command to add:
 
-- Symlink escape protection is unverified on this Windows environment (IR-M6) until run on a symlink-capable platform.
-- `blockedCommands` enforcement covers only the configured agent command the orchestrator spawns, not subprocesses inside a real agent (accepted architecture boundary).
-- The workspace is not yet a Git repository; GitHub preservation needs a repo-init/remote step.
+- `agent-flow run-until-user-gate`
 
-## Open Questions
+Core behavior:
 
-- Confirm the agent `env` config field is an intentional deferral (Spec lists it; Plan schema omitted it). If Wave 2 real-agent runs need per-agent env, it should be added.
-- Minor follow-ups (IR-m1, IR-m2 ordering, IR-m3 co-present YAML report, IR-m4 byte-cap, IR-m5 `--strict`, IR-m6 self-documenting init config, IR-m7 unreadable-config test) and the success-log-before-commit nit — schedule or accept as known.
+- Repeatedly call existing `nextCommand()`.
+- Re-read canonical state after every step.
+- Stop successfully when `state.currentActor === "user"`.
+- Stop successfully when `state.status === "done"` or `state.currentActor === "none"`.
+- Stop immediately on the first `nextCommand()` error.
+- Stop fail-closed on internal step-limit exhaustion.
 
-## User Decisions Required
+Architecture:
 
-- Whether to initialize this project as a Git repository and preserve to GitHub (and whether to include `dist/`).
-- Whether any deferred Minor must be addressed before considering the MVP "done".
-- Agent `env` deferral (above).
+- Add `src/commands/run-until-user-gate.ts`.
+- Add `src/workflow/run-stop.ts`.
+- Update CLI parser/dispatch/help.
+- Do not duplicate `nextCommand()` guardrail, logging, lock, proposal, or state-transition logic.
+- Do not add public config fields in this wave.
+- Do not introduce persistent aggregate audit logs in this wave; each step keeps using `nextCommand()` run logs.
+
+Future extension boundary:
+
+- Add a small `evaluateRunStop()` function returning a decision object.
+- Current policy is only `stop on any user actor` / `stop on done` / `continue otherwise`.
+- Future Gate Policy Engine can extend this with delegated gates, hard floors, review verdict evidence, and richer stop reasons.
+
+## Known Risks / Residuals
+
+- IR-M6 symlink guardrail tests are still unverified on this Windows environment.
+- `blockedCommands` enforcement remains scoped to the configured command the orchestrator spawns, not subprocesses inside a real agent.
+- Agent `env` remains deferred; do not add it in this wave unless the user explicitly changes scope.
+- Deferred MVP minors remain available as future cleanup, but the user selected `run-until-user-gate` only for this wave.
+
+## Open Questions For Claude Review
+
+- Is the fixed internal step limit acceptable without a public config field for this wave?
+- Should the step-limit value be specified exactly in the implementation plan, or left as a named constant with tests?
+- Is per-step locking via existing `nextCommand()` sufficient, or is any additional coordination needed without conflicting with the existing lock?
+- Should the command return the original `nextCommand()` error code unchanged, or wrap it with a run summary while preserving the original code in details?
+
+## User Decisions Already Made
+
+- Proceed with `run-until-user-gate` only.
+- Use the Loop Wrapper approach.
+- Stop at every `user` actor phase.
+- Consider future Gate Policy Engine migration, but do not implement it in this wave.
 
 ## Next Required Action
 
-The user_verification gate is functionally cleared (items 1-3 PASS; item 4 is a platform residual to run on a symlink-capable host). The user decides the next step:
+Claude Code should review `.agent/artifacts/run_until_user_gate_design.md` and produce a review artifact, suggested path:
 
-- (a) Proceed to `final_handoff` → `done` for the MVP (Codex produces the final handoff), or
-- (b) Begin planning the next wave: `run-until-user-gate` (the prerequisite for the queued gate-delegation design), restarting the standard workflow (Requirement Understanding / Spec) for that wave.
+- `.agent/artifacts/run_until_user_gate_design_review.md`
 
-Either path resumes the normal Codex↔Claude handoff. The IR-M6 symlink run and the deferred Minors (IR-m1..m7, agent `env`) can be scheduled into whichever wave is convenient.
+If approved, hand back for implementation plan creation. If revisions are needed, list blocking/major/minor issues and update this handoff for Codex.
 
 ---
 
-# Queued Future-Wave Handoff: Gate Delegation Design (NOT part of the current cycle)
+# Queued Future-Wave Handoff: Gate Delegation Design (NOT part of the current wave)
 
-The approved design for a future `agent-flow` feature — gate delegation (per-project autonomy profile) — remains queued and delivered alongside this cycle. It must NOT be implemented now.
+The approved design for a future `agent-flow` feature — gate delegation (per-project autonomy profile) — remains queued. It must NOT be implemented in the `run-until-user-gate` wave.
 
-- Design document: `.agent/proposals/2026-06-14-gate-delegation-design.md` (read in full before any future planning).
-- Summary: per-project opt-in (default OFF) to auto-pass selected user gates (`user_plan_approval`, `user_verification`, review-iteration convergence) at a STRICT bar (review verdict `Approved` with 0 Blocking / 0 Major), while a compiled-in hard floor (destructive actions, always-protected paths, credential/prod/external access, approved-Plan deviation) and `user_spec_review` always stop for the user. Machine-readable `review_verdict.json` (not Markdown parsing) drives decisions. Config is agent-immutable (anti-escalation). Audit log + end-of-run digest.
-- Sequencing: MVP (current) → `run-until-user-gate` wave → gate-delegation wave. Do NOT write its implementation plan until `run-until-user-gate` and a machine-readable `review_verdict.json` exist.
-- Foundation note: IR-M3 (the now-implemented outcome-aware audit log) is the basis for the delegation end-of-run digest — the delegation wave should build the digest on top of the run-log fields added here.
-
-When the MVP cycle and user verification are complete, this design becomes the basis for planning the delegation wave (after run-until-user-gate).
+- Design document: `.agent/proposals/2026-06-14-gate-delegation-design.md`
+- Summary: per-project opt-in (default OFF) to auto-pass selected user gates (`user_plan_approval`, `user_verification`, review-iteration convergence) at a STRICT bar (review verdict `Approved` with 0 Blocking / 0 Major), while a compiled-in hard floor and `user_spec_review` always stop for the user.
+- Sequencing: MVP → `run-until-user-gate` wave → machine-readable `review_verdict.json` if needed → gate-delegation wave.
+- The `run-until-user-gate` design intentionally keeps a stop-decision boundary so this later policy engine can be added without rewriting the command loop.
