@@ -210,6 +210,22 @@ test("run-until-user-gate step limit fails closed after one successful step with
   assert.equal(await exists(join(workspace, ".agent", "invoked-spec_creation")), false);
 });
 
+test("run-until-user-gate step limit fails closed without mutating state after exhaustion", async () => {
+  const workspace = await setupWorkspace("fake-agent-run-until-cycle.mjs");
+
+  const result = await runUntilUserGateCommand({ workspace, maxSteps: 2 });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.code, "RUN_UNTIL_STEP_LIMIT");
+    assert.equal(result.error.details?.stepsRun, 2);
+    assert.equal(result.error.details?.maxSteps, 2);
+  }
+  const state = await readWorkflowState(workspace);
+  assert.equal(state.phase, "spec_review");
+  assert.equal(state.currentActor, "review");
+});
+
 test("run-until-user-gate rejects invalid maxSteps without invoking the agent", async () => {
   const workspace = await setupWorkspace("fake-agent.mjs");
 
