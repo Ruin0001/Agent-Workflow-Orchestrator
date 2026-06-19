@@ -2,27 +2,25 @@
 
 ## Current Phase
 
-Gate-delegation implementation review fixes complete; awaiting Claude re-review.
+Gate-delegation v1 implementation review converged (APPROVED); at user_verification.
 
 ## Current Status
 
-Codex received the Claude Code implementation review for Gate Delegation v1 using `superpowers:receiving-code-review`, verified the findings against the codebase, and applied the accepted fixes without expanding scope beyond v1 `user_plan_approval`.
+The Claude Code review session re-reviewed the fix pass by verifying each change directly in source and running the suite independently (158 tests, 156 pass, 0 fail, 2 platform-skip). Approval status: **Approved**. GDI-B1 (verdict status enum → the four ratified statuses) is fixed and verified; GDI-m1/m2/m3 resolved; GDI-m4 accepted. The implementation review iteration has converged. Re-review artifact: `.agent/artifacts/gate_delegation_implementation_review_2.md`.
 
-The blocking verdict-schema mismatch is fixed. The plan review verdict schema now accepts exactly the ratified four statuses: `Approved`, `Approved with minor comments`, `Needs revision`, and `Blocked`. `Rejected` is no longer accepted. `strictBarPasses` remains strict: only exact `Approved` with 0 Blocking and 0 Major can auto-clear.
-
-Manual handoff mode remains in effect.
+The gate-delegation v1 feature is implementation-complete and verified. Manual handoff mode remains in effect.
 
 ## Previous Actor
 
-Codex implementation session
+Claude Code review session
 
 ## Next Actor
 
-Claude Code review session
+User
 
 ## Current Task
 
-Re-review the Gate Delegation v1 implementation review fixes, especially GDI-B1 and the below-bar delegated integration path.
+User performs final verification of gate-delegation v1, then decides how to close out the wave (see Next Required Action).
 
 ## Review Artifacts
 
@@ -90,6 +88,17 @@ Claude should verify:
 - Digest/audit are written before state advance; a rare state write failure after digest/audit success may over-report a non-advance, accepted as fail-closed for v1.
 - Digest-write-failure negative test remains deferred.
 
+## User Verification (suggested)
+
+- In a disposable Git workspace: `agent-flow init`, set `delegation.enabled: true` (`delegatedGates: ["user_plan_approval"]`), and run `agent-flow run-until-user-gate --delegated` with a fake `plan_review` agent emitting a strict `Approved`/0/0 verdict → confirm `user_plan_approval` auto-clears to `task_classification` and a `delegation_digest.md` is written.
+- Repeat with an `Approved with minor comments` verdict → confirm a clean stop at `user_plan_approval` (no auto-clear, no digest).
+- Confirm an agent editing `.agent-flow.json` is blocked (`GUARDRAIL_AGENT_IMMUTABLE_PATH`).
+- (The review session already verified all of the above via the test suite; this is optional live confirmation.)
+
 ## Next Required Action
 
-Claude re-reviews the implementation review fixes. If approved, route onward to the kept `user_verification` gate.
+User decides:
+- (a) Close out gate-delegation v1 → `final_handoff` / `done` (Codex writes the final handoff), and optionally push to GitHub.
+- (b) Start a follow-on wave — e.g., the deferred delegation scope (`user_verification` via a testing-verdict model, or `spec_review`/`implementation_review` verdict emission), or clearing residuals (IR-M6 symlink run on a capable platform; digest-write-failure negative test; deferred MVP minors).
+
+Either path resumes the normal Codex↔Claude handoff.
