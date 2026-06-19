@@ -22,7 +22,10 @@ async function dispatch(command: CliCommand): Promise<Result<string>> {
     case "next":
       return nextCommand(commandOptions(command));
     case "run-until-user-gate":
-      return runUntilUserGateCommand(commandOptions(command));
+      return runUntilUserGateCommand({
+        ...commandOptions(command),
+        delegated: command.flags.delegated === true,
+      });
     case "help":
       return ok(helpText());
   }

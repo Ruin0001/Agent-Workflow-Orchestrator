@@ -152,5 +152,11 @@ export function applyConfigDefaults(input: PartialAgentFlowConfig): AgentFlowCon
       transcriptCapture: input.logging?.transcriptCapture ?? "off",
       persistPrompts: input.logging?.persistPrompts ?? "off",
     },
+    delegation: {
+      enabled: input.delegation?.enabled ?? false,
+      delegatedGates: arrayOrDefault(input.delegation?.delegatedGates, ["user_plan_approval"]),
+      autoPassBar: input.delegation?.autoPassBar ?? "approved_no_blocking_no_major",
+      digestOnStop: input.delegation?.digestOnStop ?? true,
+    },
   };
 }

@@ -15,6 +15,7 @@ export const STANDARD_ARTIFACT_NAMES = [
   "test_results",
   "final_handoff",
   "allowed_change_manifest",
+  "plan_review_verdict",
 ] as const;
 
 export type StandardArtifactName = (typeof STANDARD_ARTIFACT_NAMES)[number];
@@ -44,6 +45,7 @@ export function resolveArtifactPaths(
     test_results: `${artifactDir}/test_results.md`,
     final_handoff: `${artifactDir}/final_handoff.md`,
     allowed_change_manifest: config.artifacts.allowedChangeManifest,
+    plan_review_verdict: `${artifactDir}/plan_review_verdict.json`,
   };
 
   const paths = { ...defaults };

@@ -54,6 +54,7 @@ test("renderPrompt produces deterministic prompt text without reading files", ()
   assert.match(rendered, /Phase: requirement_understanding/);
   assert.match(rendered, /Role: implementation/);
   assert.match(rendered, /spec: \.agent\/artifacts\/spec\.md/);
+  assert.match(rendered, /plan_review_verdict: \.agent\/artifacts\/plan_review_verdict\.json/);
   assert.match(rendered, /Stop after producing the required artifact\./);
   assert.match(rendered, /Do not implement commands\/next\/agents\/guards\./);
 });

@@ -48,6 +48,16 @@ test("parses run-until-user-gate command", () => {
   }
 });
 
+test("parses delegated flag for run-until-user-gate", () => {
+  const result = parseArgs(["--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.name, "run-until-user-gate");
+    assert.equal(result.value.flags.delegated, true);
+  }
+});
+
 test("parses config and workspace path flags", () => {
   const result = parseArgs([
     "status",
@@ -104,6 +114,15 @@ test("treats flag-shaped tokens after delimiter as positionals", () => {
     assert.equal(result.error.code, "USAGE_ERROR");
     assert.match(result.error.message, /Unknown command: --verbose/);
     assert.doesNotMatch(result.error.message, /Unknown flag/);
+  }
+});
+
+test("treats delegated after delimiter as positional", () => {
+  const result = parseArgs(["--", "--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.error.message, /Unknown command: --delegated run-until-user-gate/);
   }
 });
 

@@ -25,5 +25,6 @@ export function helpText(): string {
     "  --config <path>",
     "  --workspace <path>",
     "  --strict",
+    "  --delegated    Use configured gate delegation for run-until-user-gate",
   ].join("\n");
 }

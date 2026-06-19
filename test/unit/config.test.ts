@@ -110,6 +110,12 @@ test("applyConfigDefaults returns a complete valid v1 config", () => {
     transcriptCapture: "off",
     persistPrompts: "off",
   });
+  assert.deepEqual(config.delegation, {
+    enabled: false,
+    delegatedGates: ["user_plan_approval"],
+    autoPassBar: "approved_no_blocking_no_major",
+    digestOnStop: true,
+  });
 });
 
 test("validateConfig accepts advisory mode and rejects full-auto mode", () => {
@@ -145,6 +151,60 @@ test("validateConfig validates guardrails blockedCommands as a string array", ()
   if (!invalidResult.ok) {
     assert.equal(invalidResult.error.path, "$.guardrails.blockedCommands[1]");
     assert.match(invalidResult.error.message, /strings/i);
+  }
+});
+
+test("delegation config defaults to disabled v1 policy", () => {
+  const config = applyConfigDefaults({ version: 1 });
+
+  assert.deepEqual(config.delegation, {
+    enabled: false,
+    delegatedGates: ["user_plan_approval"],
+    autoPassBar: "approved_no_blocking_no_major",
+    digestOnStop: true,
+  });
+});
+
+test("validateConfig accepts the v1 delegation config", () => {
+  const result = validateConfig({
+    version: 1,
+    delegation: {
+      enabled: true,
+      delegatedGates: ["user_plan_approval"],
+      autoPassBar: "approved_no_blocking_no_major",
+      digestOnStop: true,
+    },
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.delegation.enabled, true);
+  }
+});
+
+test("validateConfig rejects non-v1 delegation gates", () => {
+  for (const gate of ["review_iteration", "user_verification", "user_spec_review"]) {
+    const result = validateConfig({
+      version: 1,
+      delegation: { enabled: true, delegatedGates: [gate] },
+    });
+
+    assert.equal(result.ok, false, gate);
+    if (!result.ok) {
+      assert.match(result.error.message, /delegatedGates|user_plan_approval/i);
+    }
+  }
+});
+
+test("validateConfig rejects unsupported delegation auto pass bars", () => {
+  const result = validateConfig({
+    version: 1,
+    delegation: { autoPassBar: "approved_with_minor_comments" },
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.path, "$.delegation.autoPassBar");
   }
 });
 

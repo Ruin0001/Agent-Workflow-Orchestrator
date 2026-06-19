@@ -52,11 +52,23 @@ export type AgentFlowConfig = {
     transcriptCapture: "off";
     persistPrompts: "off" | "configured";
   };
+  delegation: DelegationConfig;
 };
 
 export type AutomationMode = "advisory" | "assisted";
 
 export type AgentRole = "implementation" | "review";
+
+export type DelegatedGate = "user_plan_approval";
+
+export type DelegationAutoPassBar = "approved_no_blocking_no_major";
+
+export type DelegationConfig = {
+  enabled: boolean;
+  delegatedGates: DelegatedGate[];
+  autoPassBar: DelegationAutoPassBar;
+  digestOnStop: boolean;
+};
 
 export type AgentConfig = {
   role: AgentRole;
@@ -86,6 +98,7 @@ export type PartialAgentFlowConfig = {
   projectContext?: OptionalSection<AgentFlowConfig["projectContext"]>;
   artifacts?: OptionalSection<AgentFlowConfig["artifacts"]>;
   logging?: OptionalSection<AgentFlowConfig["logging"]>;
+  delegation?: OptionalSection<DelegationConfig>;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -320,6 +333,35 @@ function readPartialConfig(input: unknown): Result<PartialAgentFlowConfig> {
     };
   }
 
+  if ("delegation" in input) {
+    const result = readObject(input.delegation, "$.delegation");
+    if (!result.ok) return result;
+    const delegatedGates = readOptionalStringArray(
+      result.value,
+      "delegatedGates",
+      "$.delegation.delegatedGates",
+    );
+    if (!delegatedGates.ok) return delegatedGates;
+    const autoPassBar = result.value.autoPassBar;
+    if (
+      autoPassBar !== undefined &&
+      autoPassBar !== "approved_no_blocking_no_major"
+    ) {
+      return err(
+        validationError(
+          "$.delegation.autoPassBar",
+          "delegation autoPassBar must be approved_no_blocking_no_major",
+        ),
+      );
+    }
+    config.delegation = {
+      enabled: readOptionalBoolean(result.value, "enabled", "$.delegation.enabled"),
+      delegatedGates: delegatedGates.value as DelegatedGate[] | undefined,
+      autoPassBar: autoPassBar as DelegationAutoPassBar | undefined,
+      digestOnStop: readOptionalBoolean(result.value, "digestOnStop", "$.delegation.digestOnStop"),
+    };
+  }
+
   return ok(config);
 }
 
@@ -362,10 +404,23 @@ function validateCompleteConfig(config: AgentFlowConfig): Result<AgentFlowConfig
     [config.projectContext.sourceOfTruth, "$.projectContext.sourceOfTruth"],
     [config.projectContext.files, "$.projectContext.files"],
     [config.projectContext.extraInstructions, "$.projectContext.extraInstructions"],
+    [config.delegation.delegatedGates, "$.delegation.delegatedGates"],
   ];
   for (const [value, path] of arrays) {
     if (!Array.isArray(value)) {
       return err(validationError(path, "Value must be an array"));
+    }
+  }
+
+  for (let index = 0; index < config.delegation.delegatedGates.length; index += 1) {
+    const gate = config.delegation.delegatedGates[index];
+    if (gate !== "user_plan_approval") {
+      return err(
+        validationError(
+          `$.delegation.delegatedGates[${index}]`,
+          "V1 delegation supports only user_plan_approval",
+        ),
+      );
     }
   }
 

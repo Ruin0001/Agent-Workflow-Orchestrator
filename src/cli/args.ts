@@ -12,7 +12,7 @@ export type CliCommand =
   | { name: "help"; flags: CliFlags };
 
 const stringFlags = new Set(["config", "workspace"]);
-const booleanFlags = new Set(["strict"]);
+const booleanFlags = new Set(["strict", "delegated"]);
 
 export function parseArgs(argv: string[]): Result<CliCommand> {
   const positionals: string[] = [];

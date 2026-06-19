@@ -13,6 +13,7 @@ export type RunUntilUserGateOptions = {
   workspace?: string;
   configPath?: string;
   maxSteps?: number;
+  delegated?: boolean;
 };
 
 export async function runUntilUserGateCommand(
