@@ -103,6 +103,7 @@ export function applyConfigDefaults(input: PartialAgentFlowConfig): AgentFlowCon
       requireGitForFullGuardrails: input.guardrails?.requireGitForFullGuardrails ?? true,
       requireCleanWorkingTree: input.guardrails?.requireCleanWorkingTree ?? true,
       protectedPaths: arrayOrDefault(input.guardrails?.protectedPaths, [
+        ".agent-flow.json",
         ".env",
         ".env.*",
         ".git/**",

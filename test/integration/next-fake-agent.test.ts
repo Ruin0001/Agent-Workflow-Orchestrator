@@ -329,6 +329,20 @@ test("next blocks modifying .env after a Git-backed agent run", async (t) => {
   assert.equal((await runLogLines(workspace)).length, 1);
 });
 
+test("next blocks agent edits to .agent-flow.json even when config would remove protectedPaths", async (t) => {
+  const workspace = await setupGitGuardrailWorkspace("fake-agent-modify-agent-flow-config.mjs");
+  if (workspace === undefined) {
+    t.skip("git is unavailable");
+    return;
+  }
+
+  const result = await captureMain(["--workspace", workspace, "next"]);
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr.join("\n"), /\.agent-flow\.json|agent-immutable|protected/i);
+  assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
+});
+
 test("next blocks a dirty Git working tree before invoking the agent", async (t) => {
   const workspace = await setupGitGuardrailWorkspace("fake-agent.mjs");
   if (workspace === undefined) {

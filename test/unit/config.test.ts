@@ -67,6 +67,7 @@ test("applyConfigDefaults returns a complete valid v1 config", () => {
   assert.equal(config.guardrails.requireGitForFullGuardrails, true);
   assert.equal(config.guardrails.requireCleanWorkingTree, true);
   assert.deepEqual(config.guardrails.protectedPaths, [
+    ".agent-flow.json",
     ".env",
     ".env.*",
     ".git/**",

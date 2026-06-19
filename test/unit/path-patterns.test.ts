@@ -260,6 +260,54 @@ test("ignored destination paths do not hide protected rename sources", async () 
   }
 });
 
+test("agent flow config is blocked even when protectedPaths is overridden", async () => {
+  const blocked = await enforceChangePolicy({
+    workspace: process.cwd(),
+    config: applyConfigDefaults({
+      version: 1,
+      guardrails: { protectedPaths: [] },
+    }),
+    changedFiles: [
+      {
+        path: ".agent-flow.json",
+        status: "modified",
+        addedLines: 1,
+        deletedLines: 1,
+      },
+    ],
+  });
+
+  assert.equal(blocked.ok, false);
+  if (!blocked.ok) {
+    assert.equal(blocked.error.code, "GUARDRAIL_AGENT_IMMUTABLE_PATH");
+    assert.match(blocked.error.message, /\.agent-flow\.json|agent-immutable/i);
+  }
+});
+
+test("renaming agent flow config is blocked by the hard-coded guardrail", async () => {
+  const blocked = await enforceChangePolicy({
+    workspace: process.cwd(),
+    config: applyConfigDefaults({
+      version: 1,
+      guardrails: { protectedPaths: [] },
+    }),
+    changedFiles: [
+      {
+        path: "agent-flow-renamed.json",
+        previousPath: ".agent-flow.json",
+        status: "modified",
+        addedLines: 0,
+        deletedLines: 0,
+      },
+    ],
+  });
+
+  assert.equal(blocked.ok, false);
+  if (!blocked.ok) {
+    assert.equal(blocked.error.code, "GUARDRAIL_AGENT_IMMUTABLE_PATH");
+  }
+});
+
 test("protected-unless rename sources require permission for the protected source path", async () => {
   const manifest = validateAllowedChangeManifest({
     filesToInspect: [],

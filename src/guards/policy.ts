@@ -26,6 +26,8 @@ const dependencyFilePatterns = [
   "bun.lockb",
 ];
 
+const agentImmutablePathPatterns = [".agent-flow.json"];
+
 export async function enforceChangePolicy(
   options: EnforceChangePolicyOptions,
 ): Promise<Result<void>> {
@@ -42,6 +44,16 @@ export async function enforceChangePolicy(
     if (!insideWorkspace.ok) return insideWorkspace;
 
     const pathsToProtect = file.previousPath === undefined ? [file.path] : [file.path, file.previousPath];
+    const immutableMatch = findFirstMatchingPathPattern(pathsToProtect, agentImmutablePathPatterns);
+    if (immutableMatch !== undefined) {
+      return err({
+        code: "GUARDRAIL_AGENT_IMMUTABLE_PATH",
+        path: immutableMatch.path,
+        message:
+          `Agent-immutable config path changed: ${immutableMatch.path} matches ${immutableMatch.pattern}`,
+      });
+    }
+
     const protectedMatch = findFirstMatchingPathPattern(
       pathsToProtect,
       options.config.guardrails.protectedPaths,
