@@ -1,12 +1,17 @@
+import { execFile } from "node:child_process";
 import * as assert from "node:assert/strict";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
 import { main } from "../../src/cli/main.js";
+import { clearDelegatedUserPlanApproval } from "../../src/commands/delegated-gate-clear.js";
 import { initCommand } from "../../src/commands/init.js";
 import { runUntilUserGateCommand } from "../../src/commands/run-until-user-gate.js";
 import { validateState, type WorkflowState } from "../../src/state/schema.js";
+
+const execFileAsync = promisify(execFile);
 
 async function tempWorkspace(): Promise<string> {
   const path = join(tmpdir(), `agent-flow-run-until-${Date.now()}-${Math.random()}`);
@@ -81,6 +86,32 @@ async function setupWorkspace(fixtureName: string): Promise<string> {
 
   const initialized = await initCommand({ workspace });
   assert.equal(initialized.ok, true);
+  return workspace;
+}
+
+async function setupGitGuardrailWorkspace(fixtureName: string): Promise<string | undefined> {
+  const workspace = await setupWorkspace(fixtureName);
+  const configPath = join(workspace, ".agent-flow.json");
+  const config = JSON.parse(await readFile(configPath, "utf8")) as {
+    guardrails: {
+      requireGitForFullGuardrails: boolean;
+      requireCleanWorkingTree: boolean;
+    };
+  };
+  config.guardrails.requireGitForFullGuardrails = true;
+  config.guardrails.requireCleanWorkingTree = true;
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+
+  try {
+    await execFileAsync("git", ["init"], { cwd: workspace });
+    await execFileAsync("git", ["config", "user.email", "agent-flow@example.test"], { cwd: workspace });
+    await execFileAsync("git", ["config", "user.name", "Agent Flow Test"], { cwd: workspace });
+    await execFileAsync("git", ["add", "."], { cwd: workspace });
+    await execFileAsync("git", ["commit", "-m", "baseline"], { cwd: workspace });
+  } catch {
+    return undefined;
+  }
+
   return workspace;
 }
 
@@ -317,4 +348,151 @@ test("run-until-user-gate surfaces iteration-limit exhaustion as a fail-closed s
   assert.match(errorText, /run-until-user-gate stopped after 0 steps/i);
   const finalState = await readWorkflowState(workspace);
   assert.deepEqual(finalState, before);
+});
+
+test("clearDelegatedUserPlanApproval advances user_plan_approval with audit and digest", async () => {
+  const workspace = await setupWorkspace("fake-agent-run-until-sequence.mjs");
+  const state = await readWorkflowState(workspace);
+  state.phase = "user_plan_approval";
+  state.status = "waiting_for_user";
+  state.currentActor = "user";
+  state.nextActor = "user";
+  await writeWorkflowState(workspace, state);
+
+  const result = await clearDelegatedUserPlanApproval({
+    workspace,
+    configPath: ".agent-flow.json",
+    verdictPath: ".agent/artifacts/plan_review_verdict.json",
+    verdict: {
+      runId: "run-1",
+      phase: "plan_review",
+      status: "Approved",
+      blocking: 0,
+      major: 0,
+      minor: 0,
+      iteration: 1,
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal((await readWorkflowState(workspace)).phase, "task_classification");
+  const runLog = await readFile(join(workspace, ".agent", "logs", "runs.jsonl"), "utf8");
+  assert.match(runLog, /delegated_auto_pass/);
+  assert.equal(await exists(join(workspace, ".agent", "logs", "delegation_digest.md")), true);
+});
+
+test("run-until-user-gate --delegated auto-clears user_plan_approval only with same-run verdict", async () => {
+  const workspace = await setupWorkspace("fake-agent-gate-delegation-plan.mjs");
+  const configPath = join(workspace, ".agent-flow.json");
+  const config = JSON.parse(await readFile(configPath, "utf8")) as Record<string, unknown>;
+  config.delegation = { enabled: true, delegatedGates: ["user_plan_approval"] };
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  const state = await readWorkflowState(workspace);
+  state.phase = "plan_creation";
+  state.status = "ready";
+  state.currentActor = "implementation";
+  state.nextActor = "implementation";
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  const output = result.stdout.join("\n");
+  assert.match(output, /Delegated auto-clear: user_plan_approval -> task_classification/);
+  assert.match(output, /Stopped at user gate: user_verification/);
+  const finalState = await readWorkflowState(workspace);
+  assert.equal(finalState.phase, "user_verification");
+  assert.equal(await exists(join(workspace, ".agent", "logs", "delegation_digest.md")), true);
+});
+
+test("run-until-user-gate --delegated refuses when config delegation is disabled", async () => {
+  const workspace = await setupWorkspace("fake-agent-gate-delegation-plan.mjs");
+
+  const result = await captureMain(["--workspace", workspace, "--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr.join("\n"), /delegation is disabled/i);
+  assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
+});
+
+test("run-until-user-gate --delegated stops cleanly at user_plan_approval for stale verdict", async () => {
+  const workspace = await setupWorkspace("fake-agent-gate-delegation-stale-verdict.mjs");
+  const configPath = join(workspace, ".agent-flow.json");
+  const config = JSON.parse(await readFile(configPath, "utf8")) as Record<string, unknown>;
+  config.delegation = { enabled: true, delegatedGates: ["user_plan_approval"] };
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  const state = await readWorkflowState(workspace);
+  state.phase = "plan_creation";
+  state.status = "ready";
+  state.currentActor = "implementation";
+  state.nextActor = "implementation";
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  const output = result.stdout.join("\n");
+  assert.match(output, /Stopped at user gate: user_plan_approval/);
+  assert.doesNotMatch(output, /Delegated auto-clear/);
+  assert.equal((await readWorkflowState(workspace)).phase, "user_plan_approval");
+  assert.equal(await exists(join(workspace, ".agent", "logs", "delegation_digest.md")), false);
+});
+
+test("run-until-user-gate --delegated started at user_plan_approval stops without prior-run verdict replay", async () => {
+  const workspace = await setupWorkspace("fake-agent-gate-delegation-plan.mjs");
+  const configPath = join(workspace, ".agent-flow.json");
+  const config = JSON.parse(await readFile(configPath, "utf8")) as Record<string, unknown>;
+  config.delegation = { enabled: true, delegatedGates: ["user_plan_approval"] };
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  await writeFile(
+    join(workspace, ".agent", "artifacts", "plan_review_verdict.json"),
+    JSON.stringify(
+      {
+        runId: "prior-run",
+        phase: "plan_review",
+        status: "Approved",
+        blocking: 0,
+        major: 0,
+        minor: 0,
+        iteration: 1,
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf8",
+  );
+  const state = await readWorkflowState(workspace);
+  state.phase = "user_plan_approval";
+  state.status = "waiting_for_user";
+  state.currentActor = "user";
+  state.nextActor = "user";
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  const output = result.stdout.join("\n");
+  assert.match(output, /Stopped at user gate: user_plan_approval/);
+  assert.doesNotMatch(output, /Delegated auto-clear/);
+  assert.equal(await exists(join(workspace, ".agent", "artifacts", "plan_review_verdict.json")), false);
+});
+
+test("run-until-user-gate --delegated blocks agent edits to .agent-flow.json", async (t) => {
+  const workspace = await setupGitGuardrailWorkspace("fake-agent-modify-agent-flow-config.mjs");
+  if (workspace === undefined) {
+    t.skip("git is unavailable");
+    return;
+  }
+  const configPath = join(workspace, ".agent-flow.json");
+  const config = JSON.parse(await readFile(configPath, "utf8")) as Record<string, unknown>;
+  config.delegation = { enabled: true, delegatedGates: ["user_plan_approval"] };
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  await execFileAsync("git", ["add", ".agent-flow.json"], { cwd: workspace });
+  await execFileAsync("git", ["commit", "-m", "enable delegation"], { cwd: workspace });
+
+  const result = await captureMain(["--workspace", workspace, "--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr.join("\n"), /\.agent-flow\.json|agent-immutable|protected/i);
+  assert.equal((await readWorkflowState(workspace)).phase, "requirement_understanding");
 });

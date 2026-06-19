@@ -167,6 +167,29 @@ test("status reports initialized workflow summary", async () => {
   assert.match(output, /Next required action:/);
 });
 
+test("status reports delegation digest pointer when present", async () => {
+  const workspace = await tempWorkspace();
+  assert.equal((await captureMain(["--workspace", workspace, "init"])).exitCode, 0);
+  await writeFile(
+    join(workspace, ".agent", "logs", "delegation_digest_latest.md"),
+    [
+      "## Delegation Digest",
+      "",
+      "- Gate: user_plan_approval",
+      "Final stop: Stopped at user gate: user_verification",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const result = await statusCommand({ workspace });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.match(result.value, /Delegation digest: \.agent\/logs\/delegation_digest_latest\.md/);
+    assert.match(result.value, /Delegated auto-passes: 1/);
+  }
+});
+
 test("status reports not initialized when canonical state is missing", async () => {
   const workspace = await tempWorkspace();
 
