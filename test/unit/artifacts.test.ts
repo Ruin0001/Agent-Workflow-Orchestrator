@@ -99,6 +99,50 @@ test("validatePlanReviewVerdict accepts strict approved verdicts", () => {
   }
 });
 
+test("validatePlanReviewVerdict accepts the standard plan review status set", () => {
+  const acceptedStatuses = [
+    "Approved",
+    "Approved with minor comments",
+    "Needs revision",
+    "Blocked",
+  ] as const;
+
+  for (const status of acceptedStatuses) {
+    const result = validatePlanReviewVerdict({
+      runId: `run-${status}`,
+      phase: "plan_review",
+      status,
+      blocking: 0,
+      major: 0,
+      minor: 0,
+      iteration: 0,
+    });
+
+    assert.equal(result.ok, true, `${status} should validate`);
+    if (result.ok) {
+      assert.equal(result.value.status, status);
+      assert.equal(result.value.iteration, 0);
+    }
+  }
+});
+
+test("validatePlanReviewVerdict rejects non-standard plan review statuses", () => {
+  const result = validatePlanReviewVerdict({
+    runId: "run-1",
+    phase: "plan_review",
+    status: "Rejected",
+    blocking: 0,
+    major: 0,
+    minor: 0,
+    iteration: 0,
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.path, "$.status");
+  }
+});
+
 test("validatePlanReviewVerdict rejects wrong phase and stale runId shape", () => {
   const wrongPhase = validatePlanReviewVerdict({
     runId: "run-1",
@@ -125,6 +169,25 @@ test("validatePlanReviewVerdict rejects wrong phase and stale runId shape", () =
 
   assert.equal(emptyRunId.ok, false);
   if (!emptyRunId.ok) assert.equal(emptyRunId.error.path, "$.runId");
+});
+
+test("strictBarPasses rejects valid below-bar statuses", () => {
+  for (const status of ["Approved with minor comments", "Blocked"] as const) {
+    const verdict = validatePlanReviewVerdict({
+      runId: `run-${status}`,
+      phase: "plan_review",
+      status,
+      blocking: 0,
+      major: 0,
+      minor: 0,
+      iteration: 0,
+    });
+
+    assert.equal(verdict.ok, true);
+    if (verdict.ok) {
+      assert.equal(strictBarPasses(verdict.value), false);
+    }
+  }
 });
 
 test("strictBarPasses rejects blocking or major findings", () => {

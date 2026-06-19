@@ -438,6 +438,30 @@ test("run-until-user-gate --delegated stops cleanly at user_plan_approval for st
   assert.equal(await exists(join(workspace, ".agent", "logs", "delegation_digest.md")), false);
 });
 
+test("run-until-user-gate --delegated stops cleanly for valid below-bar verdicts", async () => {
+  const workspace = await setupWorkspace("fake-agent-gate-delegation-below-bar-verdict.mjs");
+  const configPath = join(workspace, ".agent-flow.json");
+  const config = JSON.parse(await readFile(configPath, "utf8")) as Record<string, unknown>;
+  config.delegation = { enabled: true, delegatedGates: ["user_plan_approval"] };
+  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  const state = await readWorkflowState(workspace);
+  state.phase = "plan_creation";
+  state.status = "ready";
+  state.currentActor = "implementation";
+  state.nextActor = "implementation";
+  await writeWorkflowState(workspace, state);
+
+  const result = await captureMain(["--workspace", workspace, "--delegated", "run-until-user-gate"]);
+
+  assert.equal(result.exitCode, 0);
+  const output = result.stdout.join("\n");
+  assert.match(output, /Stopped at user gate: user_plan_approval/);
+  assert.match(output, /approved_no_blocking_no_major/);
+  assert.doesNotMatch(output, /Delegated auto-clear/);
+  assert.equal((await readWorkflowState(workspace)).phase, "user_plan_approval");
+  assert.equal(await exists(join(workspace, ".agent", "logs", "delegation_digest.md")), false);
+});
+
 test("run-until-user-gate --delegated started at user_plan_approval stops without prior-run verdict replay", async () => {
   const workspace = await setupWorkspace("fake-agent-gate-delegation-plan.mjs");
   const configPath = join(workspace, ".agent-flow.json");

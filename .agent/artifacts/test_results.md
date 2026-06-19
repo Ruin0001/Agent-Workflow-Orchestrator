@@ -116,3 +116,33 @@ Coverage added:
 - stale/mismatched verdict stop behavior
 - prior-run verdict replay prevention
 - status digest summary
+
+## Gate Delegation Implementation Review Fix Verification
+
+Date: 2026-06-19
+
+Red phase:
+
+- `npm run build; node --test dist/test/unit/artifacts.test.js dist/test/integration/run-until-user-gate.test.js`
+  - Result: failed as expected before production fixes
+  - Evidence: failures covered standard status validation, `Rejected` rejection, valid below-bar strict-bar rejection, and delegated below-bar output.
+
+Green/full verification:
+
+- `npm run build`
+  - Result: pass
+  - Evidence: `tsc -p tsconfig.json` exited 0.
+- `npm run typecheck`
+  - Result: pass
+  - Evidence: `tsc -p tsconfig.json --noEmit` exited 0.
+- `npm test`
+  - Result: pass with existing Windows symlink platform skips
+  - Evidence: 158 tests, 156 pass, 0 fail, 2 skipped.
+
+Fix coverage:
+
+- GDI-B1: verdict status schema now accepts exactly `Approved`, `Approved with minor comments`, `Needs revision`, and `Blocked`; `Rejected` is rejected.
+- GDI-m1: verdict `iteration` now accepts non-negative integers, including 0.
+- GDI-m2: delegated below-bar verdict integration stops cleanly at `user_plan_approval`, without auto-clear or digest.
+- GDI-m3: full status-set unit coverage added in `test/unit/artifacts.test.ts`.
+- GDI-m4: config override hard-floor assertion was already present; digest-write-failure negative test remains deferred as an accepted v1 residual.

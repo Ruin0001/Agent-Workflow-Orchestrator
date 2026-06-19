@@ -74,7 +74,11 @@ export async function runUntilUserGateCommand(
           expectedRunId: lastPlanReviewRunId,
         });
         if (!policy.ok) {
-          return ok(formatRunSummary(decision, stepsRun, stepResults));
+          return ok(
+            formatRunSummary(decision, stepsRun, stepResults, [
+              `Delegation policy: ${policy.reason}`,
+            ]),
+          );
         }
 
         const cleared = await clearDelegatedUserPlanApproval({
@@ -186,11 +190,13 @@ function formatRunSummary(
   decision: Extract<RunStopDecision, { action: "stop" }>,
   stepsRun: number,
   stepResults: string[],
+  extraDetails: string[] = [],
 ): string {
   const details = [`Steps run: ${stepsRun}`];
   if (decision.gateReason !== undefined) {
     details.push(`Gate reason: ${decision.gateReason}`);
   }
+  details.push(...extraDetails);
   return formatMessageWithStepResults(decision.message, details, stepResults);
 }
 

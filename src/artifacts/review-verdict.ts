@@ -1,7 +1,18 @@
 import { validationError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
 
-export type PlanReviewVerdictStatus = "Approved" | "Needs revision" | "Rejected";
+export type PlanReviewVerdictStatus =
+  | "Approved"
+  | "Approved with minor comments"
+  | "Needs revision"
+  | "Blocked";
+
+const PLAN_REVIEW_VERDICT_STATUSES = [
+  "Approved",
+  "Approved with minor comments",
+  "Needs revision",
+  "Blocked",
+] as const;
 
 export type PlanReviewVerdict = {
   runId: string;
@@ -32,7 +43,7 @@ export function validatePlanReviewVerdict(input: unknown): Result<PlanReviewVerd
   if (!major.ok) return major;
   const minor = readNonNegativeInteger(root.value.minor, "$.minor");
   if (!minor.ok) return minor;
-  const iteration = readPositiveInteger(root.value.iteration, "$.iteration");
+  const iteration = readNonNegativeInteger(root.value.iteration, "$.iteration");
   if (!iteration.ok) return iteration;
 
   return ok({
@@ -65,22 +76,20 @@ function readNonEmptyString(input: unknown, path: string): Result<string> {
 }
 
 function readStatus(input: unknown, path: string): Result<PlanReviewVerdictStatus> {
-  if (input === "Approved" || input === "Needs revision" || input === "Rejected") {
-    return ok(input);
+  if (PLAN_REVIEW_VERDICT_STATUSES.some((status) => status === input)) {
+    return ok(input as PlanReviewVerdictStatus);
   }
-  return err(validationError(path, "Status must be Approved, Needs revision, or Rejected"));
+  return err(
+    validationError(
+      path,
+      "Status must be Approved, Approved with minor comments, Needs revision, or Blocked",
+    ),
+  );
 }
 
 function readNonNegativeInteger(input: unknown, path: string): Result<number> {
   if (!Number.isInteger(input) || typeof input !== "number" || input < 0) {
     return err(validationError(path, "Value must be a non-negative integer"));
-  }
-  return ok(input);
-}
-
-function readPositiveInteger(input: unknown, path: string): Result<number> {
-  if (!Number.isInteger(input) || typeof input !== "number" || input <= 0) {
-    return err(validationError(path, "Value must be a positive integer"));
   }
   return ok(input);
 }
