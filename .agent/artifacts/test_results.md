@@ -86,3 +86,33 @@ Run-until task reviews:
 - Run `agent-flow init` in a disposable workspace and inspect created files.
 - Configure a real implementation agent command and run one `agent-flow next` phase in assisted mode.
 - In a Git-backed disposable workspace, verify protected-path guardrails block expected unauthorized changes.
+
+## Gate Delegation Wave Verification
+
+Date: 2026-06-19
+
+- `npm run build`
+  - Result: pass
+  - Evidence: `tsc -p tsconfig.json` exited 0.
+- `npm run typecheck`
+  - Result: pass
+  - Evidence: `tsc -p tsconfig.json --noEmit` exited 0.
+- `npm test`
+  - Result: pass with existing Windows symlink platform skips
+  - Evidence: 154 tests, 152 pass, 0 fail, 2 skipped.
+
+Coverage added:
+
+- agent-immutable `.agent-flow.json` guardrail defaults and hard-coded policy enforcement
+- delegated and non-delegated `.agent-flow.json` edit block tests
+- delegation config defaults and validation
+- delegated CLI flag parsing and help output
+- plan review verdict validation and strict bar
+- structured `nextStepCommand()` metadata
+- v1 delegation policy
+- validated non-agent `user_plan_approval` auto-clear transition
+- delegation digest writing
+- delegated run-until integration
+- stale/mismatched verdict stop behavior
+- prior-run verdict replay prevention
+- status digest summary
