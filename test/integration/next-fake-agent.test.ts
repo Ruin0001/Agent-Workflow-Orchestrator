@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import { main } from "../../src/cli/main.js";
 import { initCommand } from "../../src/commands/init.js";
+import { nextStepCommand } from "../../src/commands/next.js";
 import { validateState, type WorkflowState } from "../../src/state/schema.js";
 
 const execFileAsync = promisify(execFile);
@@ -170,6 +171,21 @@ test("next runs one implementation phase and advances after a valid proposal", a
     true,
   );
   assert.equal((await runLogLines(workspace)).length, 1);
+});
+
+test("nextStepCommand returns structured metadata while advancing", async () => {
+  const workspace = await setupWorkspace("fake-agent.mjs");
+
+  const result = await nextStepCommand({ workspace });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.phase, "requirement_understanding");
+  assert.equal(result.value.runId.length > 0, true);
+  assert.equal(result.value.proposedNextPhase, "spec_creation");
+  assert.equal(result.value.acceptedNextPhase, "spec_creation");
+  assert.equal(result.value.message, "Advanced to spec_creation");
+  assert.equal((await readWorkflowState(workspace)).phase, "spec_creation");
 });
 
 test("next run log includes audit fields after outcome is known", async () => {

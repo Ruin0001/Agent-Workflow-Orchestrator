@@ -32,6 +32,16 @@ export type NextOptions = {
   configPath?: string;
 };
 
+export type NextStepResult = {
+  message: string;
+  phase: WorkflowPhase;
+  actor: AgentRole;
+  runId: string;
+  proposedNextPhase: WorkflowPhase;
+  acceptedNextPhase: WorkflowPhase;
+  artifactPaths: string[];
+};
+
 type Proposal = {
   runId: string;
   nextPhase: WorkflowPhase;
@@ -46,6 +56,12 @@ type GuardrailLogResult = {
 };
 
 export async function nextCommand(options: NextOptions = {}): Promise<Result<string>> {
+  const result = await nextStepCommand(options);
+  if (!result.ok) return result;
+  return ok(result.value.message);
+}
+
+export async function nextStepCommand(options: NextOptions = {}): Promise<Result<NextStepResult>> {
   const workspace = options.workspace ?? process.cwd();
   const configPath = options.configPath ?? DEFAULT_CONFIG_FILE;
   const loadedConfig = await loadConfig({ cwd: workspace, configPath });
@@ -67,7 +83,7 @@ export async function nextCommand(options: NextOptions = {}): Promise<Result<str
   if (!lock.ok) return err(lock.error);
 
   let operationSucceeded = false;
-  let successMessage: string | undefined;
+  let successResult: NextStepResult | undefined;
   let releaseFailureMessage: string | undefined;
   try {
     const statePath = resolvePath(workspace, join(config.workspace.stateDir, "workflow_state.json"));
@@ -327,7 +343,15 @@ export async function nextCommand(options: NextOptions = {}): Promise<Result<str
 
     operationSucceeded = true;
     const suffix = limitedGuardrailMode ? " (limited guardrail mode: Git unavailable)" : "";
-    successMessage = `Advanced to ${proposal.value.nextPhase}${suffix}`;
+    successResult = {
+      message: `Advanced to ${proposal.value.nextPhase}${suffix}`,
+      phase: state.phase,
+      actor: currentActor,
+      runId,
+      proposedNextPhase: proposal.value.nextPhase,
+      acceptedNextPhase: proposal.value.nextPhase,
+      artifactPaths: proposalArtifactPaths(proposal.value, artifactPaths),
+    };
   } finally {
     const release = await releaseLockfile(lock.value);
     if (operationSucceeded && !release.ok) {
@@ -335,12 +359,15 @@ export async function nextCommand(options: NextOptions = {}): Promise<Result<str
     }
   }
 
-  if (successMessage !== undefined) {
+  if (successResult !== undefined) {
     const releaseSuffix =
       releaseFailureMessage === undefined
         ? ""
         : ` (warning: lock release failed: ${releaseFailureMessage})`;
-    return ok(`${successMessage}${releaseSuffix}`);
+    return ok({
+      ...successResult,
+      message: `${successResult.message}${releaseSuffix}`,
+    });
   }
 
   return err({
