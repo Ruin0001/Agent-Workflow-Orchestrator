@@ -2,103 +2,109 @@
 
 ## Current Phase
 
-Gate-delegation v1 implementation review converged (APPROVED); at user_verification.
+Gate-delegation v2 (`user_verification`) requirement understanding drafted; awaiting Claude RU review.
 
 ## Current Status
 
-The Claude Code review session re-reviewed the fix pass by verifying each change directly in source and running the suite independently (158 tests, 156 pass, 0 fail, 2 platform-skip). Approval status: **Approved**. GDI-B1 (verdict status enum → the four ratified statuses) is fixed and verified; GDI-m1/m2/m3 resolved; GDI-m4 accepted. The implementation review iteration has converged. Re-review artifact: `.agent/artifacts/gate_delegation_implementation_review_2.md`.
+Gate-delegation v1 (`user_plan_approval`) is complete, approved, committed, and pushed to `origin/main`.
 
-The gate-delegation v1 feature is implementation-complete and verified. Manual handoff mode remains in effect.
+Push status:
+
+- `git push origin main` succeeded on 2026-06-20 from the Codex session.
+- `git status -sb` after push reported `## main...origin/main` with no ahead marker.
+
+Codex then produced the v2 Requirement Understanding artifact for extending delegation to `user_verification`. No implementation has started.
+
+Manual handoff mode remains in effect.
 
 ## Previous Actor
 
-Claude Code review session
+Codex implementation session
 
 ## Next Actor
 
-User
+Claude Code review session
 
 ## Current Task
 
-User performs final verification of gate-delegation v1, then decides how to close out the wave (see Next Required Action).
+Review the v2 Requirement Understanding:
 
-## Review Artifacts
+- `.agent/artifacts/gate_delegation_v2_requirement_understanding.md`
 
-- Original implementation review: `.agent/artifacts/gate_delegation_implementation_review.md`
-- Implementation review response: `.agent/artifacts/gate_delegation_implementation_review_response.md`
-- Test evidence: `.agent/artifacts/test_results.md`
+The review should focus on whether the RU correctly frames `user_verification` delegation as an automated-evidence-only gate, whether its evidence-source recommendation is safe enough, and whether it preserves all v1 safety invariants.
 
-## Findings Resolved
+## V2 Wave Goal
 
-- GDI-B1 (Blocking): Fixed. `src/artifacts/review-verdict.ts` now uses the four ratified statuses only: `Approved`, `Approved with minor comments`, `Needs revision`, `Blocked`. `Rejected` is rejected. `strictBarPasses` still only passes exact `Approved`/0 Blocking/0 Major.
-- GDI-m1 (Minor): Fixed. `iteration` now uses non-negative integer validation and accepts 0.
-- GDI-m2 (Minor): Fixed. Added delegated integration coverage for a same-run `Approved with minor comments` verdict that validates, fails the strict bar, stops cleanly at `user_plan_approval`, does not auto-clear, and does not write a delegation digest.
-- GDI-m3 (Minor): Fixed. Added full verdict status-set unit coverage in `test/unit/artifacts.test.ts`.
-- GDI-m4 (Minor): Already partially covered / deferred. The explicit hard-floor config override assertion already exists in `test/unit/path-patterns.test.ts` as `agent flow config is blocked even when protectedPaths is overridden`. Digest-write-failure negative coverage remains deferred as an accepted v1 residual.
+Extend delegation to auto-clear `user_verification` only when objective evidence authorizes it.
 
-## Files Changed In This Fix Pass
+The intended transition is:
 
-Implementation:
+- `user_verification -> final_handoff`
 
-- `src/artifacts/review-verdict.ts`
-- `src/commands/run-until-user-gate.ts`
+The confirmed actor ownership for `final_handoff` is:
 
-Tests and fixtures:
+- `implementation`
 
-- `test/unit/artifacts.test.ts`
-- `test/integration/run-until-user-gate.test.ts`
-- `test/fixtures/fake-agent-gate-delegation-below-bar-verdict.mjs`
+## RU Recommendation Summary
 
-Artifacts:
+The RU compares three evidence models:
 
-- `.agent/artifacts/gate_delegation_implementation_review_response.md`
-- `.agent/artifacts/test_results.md`
+- Option A: a testing verdict artifact only
+- Option B: orchestrator-run configured checks
+- Option C: hybrid artifact plus orchestrator re-run
+
+The RU recommends Option B as the authorization source:
+
+- The orchestrator should run configured checks from `commands.{typecheck,lint,test,build}`.
+- Auto-clear should require at least one configured check.
+- Every configured check must run and exit `0`.
+- Missing, failing, skipped, timed-out, malformed, not-run, stale, or manual-pending verification must stop cleanly at `user_verification`.
+- Any testing verdict artifact should be audit-only or deferred unless the Spec explicitly approves a hybrid model.
+
+## Safety Points To Review
+
+- `user_spec_review` remains a kept gate.
+- The hard floor remains compiled-in and never delegable.
+- Delegation remains default OFF.
+- `user_verification` should require explicit addition to `delegation.delegatedGates`; the RU recommends not adding it to defaults.
+- v1 `user_plan_approval` behavior must remain unchanged.
+- The RU explicitly states that automated checks do not prove UX, visual correctness, external integrations, or full user acceptance.
+- A delegated run that starts already at `user_verification` must not replay old testing evidence.
+- Same-run `testing` metadata should be required before `user_verification` auto-clear.
+
+## User Decisions To Preserve For `user_spec_review`
+
+The Spec should route these to the user:
+
+- whether orchestrator-run checks are the accepted authorization source
+- the exact strict bar for automated verification
+- whether `user_verification` remains out of default delegated gates
+- whether the user accepts that auto-clear covers automated verification only
+
+## Files Created Or Updated In This Step
+
+- `.agent/artifacts/gate_delegation_v2_requirement_understanding.md`
 - `.agent/handoff.md`
 
 ## Verification
 
-Run on 2026-06-19:
+No code implementation was performed, so build/test verification was not re-run for this RU-only step.
 
-- `npm run build`: pass, `tsc -p tsconfig.json` exited 0.
-- `npm run typecheck`: pass, `tsc -p tsconfig.json --noEmit` exited 0.
-- `npm test`: pass with existing Windows symlink skips; 158 tests, 156 pass, 0 fail, 2 skipped.
+Checks performed:
 
-Red phase was also confirmed before production fixes:
-
-- `npm run build; node --test dist/test/unit/artifacts.test.js dist/test/integration/run-until-user-gate.test.js`
-- Result: failed as expected on the newly added status/iteration/below-bar tests.
-
-## Re-Review Focus
-
-Claude should verify:
-
-- Verdict status schema exactly matches the ratified Spec.
-- `Approved with minor comments` and `Blocked` validate but fail the strict bar.
-- `Rejected` is no longer accepted.
-- Below-bar delegated verdicts stop cleanly at `user_plan_approval` with no auto-clear and no digest.
-- `Approved`/0 Blocking/0 Major remains the only auto-clear bar.
-- v1 scope remains limited to `user_plan_approval`; no review_iteration/user_verification/spec_review/implementation_review verdict expansion was introduced.
+- v1 push confirmed with `git status -sb` showing `## main...origin/main`.
+- `src/workflow/transitions.ts` confirms `user_verification -> final_handoff`.
+- `src/workflow/actors.ts` confirms `final_handoff` actor is `implementation`.
+- Placeholder scan on the RU artifact found no unfinished-marker strings.
 
 ## Known Risks / Residuals
 
 - IR-M6 symlink guardrail tests remain platform-skipped on this Windows environment.
 - `blockedCommands` enforcement is scoped to the configured agent command, not subprocesses inside a real agent.
 - Agent `env` config field remains deferred.
-- The trusted-verdict boundary remains intentional: the orchestrator trusts JSON verdicts and does not cross-check Markdown.
-- Digest/audit are written before state advance; a rare state write failure after digest/audit success may over-report a non-advance, accepted as fail-closed for v1.
-- Digest-write-failure negative test remains deferred.
-
-## User Verification (suggested)
-
-- In a disposable Git workspace: `agent-flow init`, set `delegation.enabled: true` (`delegatedGates: ["user_plan_approval"]`), and run `agent-flow run-until-user-gate --delegated` with a fake `plan_review` agent emitting a strict `Approved`/0/0 verdict → confirm `user_plan_approval` auto-clears to `task_classification` and a `delegation_digest.md` is written.
-- Repeat with an `Approved with minor comments` verdict → confirm a clean stop at `user_plan_approval` (no auto-clear, no digest).
-- Confirm an agent editing `.agent-flow.json` is blocked (`GUARDRAIL_AGENT_IMMUTABLE_PATH`).
-- (The review session already verified all of the above via the test suite; this is optional live confirmation.)
+- Trusted-verdict boundary from v1 is intentionally revisited in this v2 RU; the RU recommends not using an agent-authored testing verdict as the sole authorization source.
+- Digest-write-failure negative test remains deferred from v1.
 
 ## Next Required Action
 
-User decides:
-- (a) Close out gate-delegation v1 → `final_handoff` / `done` (Codex writes the final handoff), and optionally push to GitHub.
-- (b) Start a follow-on wave — e.g., the deferred delegation scope (`user_verification` via a testing-verdict model, or `spec_review`/`implementation_review` verdict emission), or clearing residuals (IR-M6 symlink run on a capable platform; digest-write-failure negative test; deferred MVP minors).
-
-Either path resumes the normal Codex↔Claude handoff.
+Claude reviews `.agent/artifacts/gate_delegation_v2_requirement_understanding.md` and produces a requirement understanding review artifact. If approved or approved with minor comments, Codex should proceed to the v2 Spec. Do not implement before Spec, Spec Review, `user_spec_review`, Plan, Plan Review, and `user_plan_approval`.
